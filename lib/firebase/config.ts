@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics, isSupported } from 'firebase/analytics';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-api-key",
@@ -14,6 +15,7 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Initialize Analytics only on client side where supported
 let analytics = null;
@@ -21,4 +23,4 @@ if (typeof window !== 'undefined') {
     isSupported().then(yes => yes ? analytics = getAnalytics(app) : null);
 }
 
-export { app, auth, analytics };
+export { app, auth, db, analytics };
