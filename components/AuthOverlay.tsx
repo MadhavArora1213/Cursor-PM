@@ -100,7 +100,7 @@ const Eye = ({
 };
 
 export function AuthOverlay() {
-    const { user, loading } = useAuth();
+    const { user, loading, isAuthModalOpen, closeAuthModal } = useAuth();
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -175,7 +175,7 @@ export function AuthOverlay() {
         }
     };
 
-    if (loading || user) return null;
+    if (loading || user || !isAuthModalOpen) return null;
 
     return (
         <AnimatePresence>
@@ -183,14 +183,25 @@ export function AuthOverlay() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex py-8 px-4 sm:px-8 bg-[#404040] overflow-y-auto"
+                className="fixed inset-0 z-50 flex py-8 px-4 sm:px-8 bg-black/40 backdrop-blur-sm overflow-y-auto"
+                onClick={closeAuthModal}
             >
                 <motion.div
                     initial={{ scale: 0.95, y: 10, opacity: 0 }}
                     animate={{ scale: 1, y: 0, opacity: 1 }}
                     transition={{ type: "spring", stiffness: 300, damping: 25 }}
                     className="relative m-auto w-full max-w-[850px] overflow-hidden rounded-[32px] bg-white shadow-2xl flex flex-col md:flex-row min-h-[550px]"
+                    onClick={(e) => e.stopPropagation()}
                 >
+                    {/* Close Button */}
+                    <button
+                        onClick={closeAuthModal}
+                        className="absolute top-6 right-6 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 hover:bg-black/10 transition-colors"
+                    >
+                        <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                     {/* Left Hero Illustration - Uses fixed aspect ratio SVG viewBox */}
                     <div className="hidden md:block shrink-0 w-[420px] bg-[#EAEAEA] relative overflow-hidden rounded-l-[32px] border-r border-[#D9D9D9]">
                         <svg
