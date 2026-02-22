@@ -183,7 +183,7 @@ export function AuthOverlay() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex py-8 px-4 sm:px-8 bg-black/40 backdrop-blur-sm overflow-y-auto"
+                className="fixed inset-0 z-[100] flex py-8 px-4 sm:px-8 bg-black/40 backdrop-blur-sm overflow-y-auto"
                 onClick={closeAuthModal}
             >
                 <motion.div

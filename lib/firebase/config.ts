@@ -1,7 +1,7 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics, isSupported } from 'firebase/analytics';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, memoryLocalCache, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-api-key",
@@ -13,9 +13,19 @@ const firebaseConfig = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "dummy-measurement-id"
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let app: FirebaseApp;
+let db: Firestore;
+
+if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+    // Use memoryLocalCache to prevent IndexedDB conflicts between tabs and Next.js Hot Module Reloads
+    db = initializeFirestore(app, { localCache: memoryLocalCache() });
+} else {
+    app = getApp();
+    db = getFirestore(app);
+}
+
 const auth = getAuth(app);
-const db = getFirestore(app);
 
 // Initialize Analytics only on client side where supported
 let analytics = null;
