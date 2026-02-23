@@ -44,7 +44,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ];
 
     return (
-        <div className="flex min-h-screen bg-[#FAFAFA] dark:bg-[#050505] selection:bg-white/20 dark:selection:bg-white/10 text-zinc-900 dark:text-zinc-100 font-sans relative">
+        <div className="flex min-h-screen w-full overflow-x-hidden bg-[#FAFAFA] dark:bg-[#050505] selection:bg-white/20 dark:selection:bg-white/10 text-zinc-900 dark:text-zinc-100 font-sans relative">
 
             {/* Ambient Background Effects */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden hidden dark:block z-0">
@@ -144,7 +144,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </aside>
 
             {/* Main Content Area */}
-            <main className="flex-1 md:ml-[280px] p-6 md:p-12 max-w-[1600px] mx-auto w-full transition-all relative z-10">
+            <main className="flex-1 md:ml-[280px] p-4 sm:p-6 md:p-12 max-w-[1600px] mx-auto w-full transition-all relative z-10 overflow-x-hidden">
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={pathname}
@@ -162,7 +162,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Ultra Premium Sign Out Modal */}
             <AnimatePresence>
                 {showSignOutConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-auto">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}

@@ -213,7 +213,7 @@ export default function WorkspacePage() {
 
             <AnimatePresence>
                 {isCreating && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -226,19 +226,19 @@ export default function WorkspacePage() {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative w-full max-w-[480px] bg-white dark:bg-[#0A0A0A] border border-zinc-200/50 dark:border-white/10 rounded-[32px] p-8 sm:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.7)] overflow-hidden"
+                            className="relative w-full max-w-[420px] overflow-hidden bg-white dark:bg-[#0A0A0A] border border-zinc-200/80 dark:border-white/10 rounded-[32px] p-6 sm:p-8 shadow-2xl shadow-zinc-200/40 dark:shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="absolute top-[-50%] right-[-50%] w-[100%] h-[100%] bg-blue-500/10 blur-3xl rounded-full dark:bg-blue-500/20 pointer-events-none" />
+                            <div className="absolute top-[-50%] right-[-50%] w-[100%] h-[100%] bg-blue-400/5 blur-3xl rounded-full dark:bg-blue-500/20 pointer-events-none" />
 
-                            <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-blue-50 to-blue-100/50 dark:from-blue-500/10 dark:to-blue-900/10 flex items-center justify-center mb-6 border border-blue-200/50 dark:border-blue-500/20 shadow-inner">
-                                <Building2 className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+                            <div className="relative z-10 w-12 h-12 rounded-2xl bg-linear-to-br from-blue-50 to-blue-100/50 dark:from-blue-500/10 dark:to-blue-900/10 flex items-center justify-center mb-4 border border-blue-200/50 dark:border-blue-500/20 shadow-inner">
+                                <Building2 className="w-5 h-5 text-blue-500 dark:text-blue-400" />
                             </div>
 
-                            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2 relative z-10">Deploy Workspace</h2>
-                            <p className="text-[14px] text-zinc-500 dark:text-zinc-400 mb-8 relative z-10 font-medium leading-relaxed">Create a secure, isolated environment for your product team's telemetry and experiments.</p>
+                            <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2 relative z-10">Deploy Workspace</h2>
+                            <p className="text-[13px] text-zinc-500 dark:text-zinc-400 mb-5 relative z-10 font-medium leading-relaxed">Create a secure, isolated environment for your product team's telemetry and experiments.</p>
 
-                            <form onSubmit={handleCreateWorkspace} className="space-y-6 relative z-10">
+                            <form onSubmit={handleCreateWorkspace} className="space-y-4 relative z-10">
                                 <div>
                                     <label className="text-[12px] font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 block mb-2 pl-1">Instance Name</label>
                                     <input
@@ -246,7 +246,7 @@ export default function WorkspacePage() {
                                         value={newWsName}
                                         onChange={(e) => setNewWsName(e.target.value)}
                                         placeholder="e.g. Acme Corp internal tools"
-                                        className="w-full bg-zinc-50 dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 rounded-2xl px-5 py-4 text-[14px] font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-zinc-400 dark:focus:border-white/30 focus:bg-white dark:focus:bg-[#111] outline-none transition-all shadow-inner"
+                                        className="w-full bg-zinc-50 dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 rounded-2xl px-5 py-3 text-[14px] font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-zinc-400 dark:focus:border-white/30 focus:bg-white dark:focus:bg-[#111] outline-none transition-all shadow-inner"
                                         required
                                     />
                                 </div>
@@ -256,12 +256,12 @@ export default function WorkspacePage() {
                                         value={newWsDesc}
                                         onChange={(e) => setNewWsDesc(e.target.value)}
                                         placeholder="Brief context about this project's purpose..."
-                                        className="w-full bg-zinc-50 dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 rounded-2xl px-5 py-4 text-[14px] font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-zinc-400 dark:focus:border-white/30 focus:bg-white dark:focus:bg-[#111] outline-none transition-all resize-none h-28 shadow-inner"
+                                        className="w-full bg-zinc-50 dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 rounded-2xl px-5 py-3 text-[14px] font-semibold text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:border-zinc-400 dark:focus:border-white/30 focus:bg-white dark:focus:bg-[#111] outline-none transition-all resize-none h-20 shadow-inner"
                                     />
                                 </div>
-                                <div className="flex gap-4 pt-4">
-                                    <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-4 text-[14px] rounded-2xl text-zinc-600 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">Cancel</button>
-                                    <button type="submit" disabled={creatingLoading} className="flex-1 py-4 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold text-[14px] rounded-2xl hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all disabled:opacity-50 shadow-[0_4px_14px_rgba(0,0,0,0.2)] dark:shadow-[0_4px_14px_rgba(255,255,255,0.2)] active:scale-95 group relative overflow-hidden">
+                                <div className="flex gap-3 pt-2">
+                                    <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-3 text-[14px] rounded-2xl text-zinc-600 dark:text-zinc-300 font-bold hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">Cancel</button>
+                                    <button type="submit" disabled={creatingLoading} className="flex-1 py-3 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold text-[14px] rounded-2xl hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all disabled:opacity-50 shadow-[0_4px_14px_rgba(0,0,0,0.2)] dark:shadow-[0_4px_14px_rgba(255,255,255,0.2)] active:scale-95 group relative overflow-hidden">
                                         <div className="absolute inset-0 bg-white/20 dark:bg-black/10 translate-y-[100%] group-hover:translate-y-[0%] transition-transform duration-300" />
                                         <span className="relative z-10">{creatingLoading ? 'Deploying...' : 'Initialize'}</span>
                                     </button>
