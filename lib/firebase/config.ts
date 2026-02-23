@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getFirestore, initializeFirestore, memoryLocalCache, Firestore } from 'firebase/firestore';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-api-key",
@@ -15,6 +16,7 @@ const firebaseConfig = {
 
 let app: FirebaseApp;
 let db: Firestore;
+let storage: FirebaseStorage;
 
 if (!getApps().length) {
     app = initializeApp(firebaseConfig);
@@ -25,6 +27,8 @@ if (!getApps().length) {
     db = getFirestore(app);
 }
 
+storage = getStorage(app);
+
 const auth = getAuth(app);
 
 // Initialize Analytics only on client side where supported
@@ -33,4 +37,4 @@ if (typeof window !== 'undefined') {
     isSupported().then(yes => yes ? analytics = getAnalytics(app) : null);
 }
 
-export { app, auth, db, analytics };
+export { app, auth, db, storage, analytics };

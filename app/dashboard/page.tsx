@@ -1,137 +1,143 @@
 "use client";
 
-import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { signOut } from "@/lib/firebase/auth";
-import { LogOut, LayoutDashboard, Search, Users, Settings } from "lucide-react";
+import { UserProfile } from "@/components/UserProfile";
+import { motion } from "framer-motion";
+import { TrendingUp, Users, Zap, Activity, ChevronRight } from "lucide-react";
 
 export default function Home() {
   const { user } = useAuth();
-  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
+  };
+
+  const stats = [
+    { label: 'Active Experiments', value: '4', trend: '+2 this week', icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { label: 'User Interviews', value: '12', trend: '+4 this week', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { label: 'Features Shipped', value: '8', trend: 'On track', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' }
+  ];
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      {/* Sidebar */}
-      <aside className="w-64 fixed inset-y-0 left-0 border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 hidden md:flex flex-col">
-        <div className="flex items-center h-16 px-6 border-b border-zinc-200 dark:border-zinc-800">
-          <span className="font-bold text-lg tracking-tight bg-linear-to-r from-zinc-900 to-zinc-500 bg-clip-text text-transparent dark:from-white dark:to-zinc-400">
-            Cursor PM
-          </span>
-        </div>
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="max-w-[1200px] w-full mx-auto space-y-12 pb-20"
+    >
+      {/* Premium Header */}
+      <motion.header variants={itemVariants} className="flex flex-col relative">
+        <div className="absolute -top-20 -left-20 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none" />
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tighter text-zinc-900 dark:text-white">
+          Welcome back{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}.
+        </h1>
+        <p className="mt-4 text-[16px] text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed font-medium">
+          Here's a pulse check on your product ecosystem. Manage your research, active experiments, and team workflows in one unified command center.
+        </p>
+      </motion.header>
 
-        <nav className="flex-1 p-4 space-y-1">
-          {[
-            { name: 'Dashboard', icon: LayoutDashboard, current: true },
-            { name: 'Research Hub', icon: Search, current: false },
-            { name: 'Team Workspace', icon: Users, current: false },
-            { name: 'Settings', icon: Settings, current: false },
-          ].map((item) => (
-            <a
-              key={item.name}
-              href="#"
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${item.current
-                ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white'
-                : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-white'
-                }`}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.name}
-            </a>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={() => setShowSignOutConfirm(true)}
-            className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all dark:text-red-400 dark:hover:bg-red-950/30"
+      {/* Advanced Quick Stats */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {stats.map((stat, i) => (
+          <motion.div
+            key={stat.label}
+            whileHover={{ y: -5, scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="relative p-6 rounded-[32px] bg-white dark:bg-[#0A0A0A] border border-zinc-200/50 dark:border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)] overflow-hidden group"
           >
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </button>
-        </div>
-      </aside>
+            {/* Hover Gradient Effect */}
+            <div className="absolute inset-0 bg-linear-to-br from-white/40 to-white/0 dark:from-white/5 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-[32px] pointer-events-none" />
 
-      {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-8">
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Header */}
-          <header className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white">
-                Welcome back{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}!
-              </h1>
-              <p className="mt-1 text-zinc-500 dark:text-zinc-400">
-                Here's what's happening in your product ecosystem today.
-              </p>
-            </div>
-            {user?.photoURL && (
-              <img
-                src={user.photoURL}
-                alt="Profile"
-                className="w-10 h-10 rounded-full border-2 border-white shadow-sm dark:border-zinc-800"
-              />
-            )}
-          </header>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { label: 'Active Experiments', value: '4', trend: '+2 this week' },
-              { label: 'User Interviews', value: '12', trend: '+4 this week' },
-              { label: 'Features Shipped', value: '8', trend: 'On track' }
-            ].map((stat) => (
-              <div key={stat.label} className="p-6 rounded-2xl bg-white border border-zinc-200 shadow-sm dark:bg-zinc-900 dark:border-zinc-800">
-                <div className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{stat.label}</div>
-                <div className="mt-2 text-3xl font-semibold text-zinc-900 dark:text-white">{stat.value}</div>
-                <div className="mt-1 text-sm text-emerald-600 dark:text-emerald-400">{stat.trend}</div>
+            <div className="flex justify-between items-start mb-4">
+              <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center`}>
+                <stat.icon className={`w-6 h-6 ${stat.color}`} />
               </div>
-            ))}
-          </div>
-
-          {/* Recent Activity Placeholder */}
-          <div className="rounded-2xl bg-white border border-zinc-200 shadow-sm overflow-hidden dark:bg-zinc-900 dark:border-zinc-800">
-            <div className="px-6 py-5 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Recent Activity</h2>
+              <div className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-zinc-100 dark:bg-white/5 ${stat.color}`}>
+                {stat.trend}
+              </div>
             </div>
-            <div className="p-6 text-center text-zinc-500 dark:text-zinc-400">
-              Your recent product activities will appear here. Let's start by adding some user research!
-            </div>
-          </div>
-        </div>
-      </main>
 
-      {/* Sign Out Confirmation Modal */}
-      {showSignOutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 transition-opacity">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 transform transition-all scale-100">
-            <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">
-              Sign out
-            </h3>
-            <p className="mt-3 text-sm font-medium text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Are you sure you want to log out? Your current session will be closed instantly.
-            </p>
-            <div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4">
-              <button
-                type="button"
-                onClick={() => setShowSignOutConfirm(false)}
-                className="w-full sm:w-auto rounded-xl px-5 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 transition-all focus:outline-none focus:ring-2 focus:ring-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-zinc-700"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setShowSignOutConfirm(false);
-                  await signOut();
+            <div className="mt-4">
+              <div className="text-5xl font-black tracking-tighter text-zinc-900 dark:text-white mb-2">{stat.value}</div>
+              <div className="text-[14px] font-semibold text-zinc-500 dark:text-zinc-400">{stat.label}</div>
+            </div>
+
+            {/* Sparkline Graphic */}
+            <div className="absolute bottom-0 left-0 right-0 h-1bg-zinc-100 dark:bg-white/5">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${60 + (i * 15)}%` }}
+                transition={{ duration: 1.5, delay: 0.5 + (i * 0.1), ease: "circOut" }}
+                className={`h-1 ${stat.bg.replace('/10', '')}`}
+              />
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6">
+        {/* User Profile Summary */}
+        <motion.section variants={itemVariants} className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">
+              Account Configuration
+            </h2>
+          </div>
+          <UserProfile />
+        </motion.section>
+
+        {/* Recent Activity Premium Timeline Placeholder */}
+        <motion.section variants={itemVariants} className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">
+              Pulse Activity
+            </h2>
+            <button className="text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center gap-1">
+              View All <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="rounded-[32px] bg-white dark:bg-[#0A0A0A] border border-zinc-200/50 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)] overflow-hidden dark:border-white/5 h-full min-h-[460px] relative p-8">
+            {/* Grid Pattern Background */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[14px_24px] pointer-events-none" />
+
+            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+              <motion.div
+                animate={{
+                  scale: [1, 1.05, 1],
+                  rotate: [0, 5, -5, 0]
                 }}
-                className="w-full sm:w-auto rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-all focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
+                transition={{ duration: 6, repeat: Infinity, repeatType: "reverse" }}
+                className="w-20 h-20 bg-zinc-50 dark:bg-white/5 rounded-3xl flex items-center justify-center border border-zinc-200/50 dark:border-white/10 mb-6 shadow-xl backdrop-blur-sm"
               >
-                Yes, sign out
-              </button>
+                <Activity className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
+              </motion.div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">Awaiting telemetry</h3>
+              <p className="text-[14px] font-medium text-zinc-500 dark:text-zinc-400 max-w-[280px] text-center leading-relaxed">
+                Your workspace activities, team updates, and automated insights will stream here in real-time.
+              </p>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="mt-8 px-6 py-3 rounded-full bg-zinc-100 dark:bg-white/10 text-zinc-900 dark:text-white font-semibold text-sm hover:bg-zinc-200 dark:hover:bg-white/20 transition-colors"
+              >
+                Connect Data Sources
+              </motion.button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </motion.section>
+      </div>
+    </motion.div>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from "@/lib/firebase/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { Eye as EyeIcon, EyeOff as EyeOffIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Hook for calculating eye tracking
 const useEyeTracking = (
@@ -101,6 +102,7 @@ const Eye = ({
 
 export function AuthOverlay() {
     const { user, loading, isAuthModalOpen, closeAuthModal } = useAuth();
+    const router = useRouter();
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -120,6 +122,8 @@ export function AuthOverlay() {
             setErrorMsg("");
             setIsSigningIn(true);
             await signInWithGoogle();
+            closeAuthModal();
+            router.push('/dashboard');
         } catch (e: any) {
             setErrorMsg(e.message || "Error with Google sign in");
         } finally {
@@ -132,6 +136,8 @@ export function AuthOverlay() {
             setErrorMsg("");
             setIsSigningIn(true);
             await signInWithGitHub();
+            closeAuthModal();
+            router.push('/dashboard');
         } catch (e: any) {
             setErrorMsg(e.message || "Error with GitHub sign in");
         } finally {
@@ -149,6 +155,8 @@ export function AuthOverlay() {
             } else {
                 await signUpWithEmail(email, password);
             }
+            closeAuthModal();
+            router.push('/dashboard');
         } catch (e: any) {
             setErrorMsg(e.message || "Incorrect password or email");
         } finally {
