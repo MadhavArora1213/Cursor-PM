@@ -1,3 +1,8 @@
+export interface ResearchQuote {
+    text: string;
+    sentiment: 'positive' | 'negative' | 'neutral';
+}
+
 export interface ResearchItem {
     id: string;
     workspaceId: string;
@@ -8,9 +13,15 @@ export interface ResearchItem {
     status: 'pending' | 'processing' | 'analyzed' | 'failed';
     summary?: string;
     sentiment?: 'positive' | 'neutral' | 'negative' | 'mixed';
+    sentimentScore?: number;
+    sentimentDetail?: { positive: number; negative: number; neutral: number };
+    themes?: string[];
+    quotes?: ResearchQuote[];
+    wordCount?: number;
     fileUrl?: string;
     fileName?: string;
-    content?: string; // Transcribed text or document content
+    content?: string;
     createdAt: Date;
     updatedAt: Date;
 }
+

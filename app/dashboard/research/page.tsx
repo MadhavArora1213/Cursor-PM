@@ -396,9 +396,9 @@ export default function ResearchIntelligencePage() {
                                         </div>
                                     </div>
                                     <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/5">
-                                        <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Intelligence</p>
-                                        <div className="font-bold text-zinc-900 dark:text-white break-all truncate">
-                                            Extracted Quotes
+                                        <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Word Count</p>
+                                        <div className="font-bold text-zinc-900 dark:text-white">
+                                            {selectedItem.wordCount ?? '—'}
                                         </div>
                                     </div>
                                     <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-200/50 dark:border-white/5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors">
@@ -427,26 +427,38 @@ export default function ResearchIntelligencePage() {
                                                 <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                                                     <Tag className="w-5 h-5 text-emerald-500" /> Extracted Themes
                                                 </h3>
-                                                <ul className="space-y-3">
-                                                    {["User Interface Complexity", "Performance & Speed Concerns", "High Demand for Analytics Dashboard"].map((theme, i) => (
-                                                        <li key={theme} className="flex items-start gap-3 text-[14px]">
-                                                            <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">{i + 1}</div>
-                                                            <span className="font-medium text-zinc-700 dark:text-zinc-300">{theme}</span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
+                                                {selectedItem.themes && selectedItem.themes.length > 0 ? (
+                                                    <ul className="space-y-3">
+                                                        {selectedItem.themes.map((theme, i) => (
+                                                            <li key={theme} className="flex items-start gap-3 text-[14px]">
+                                                                <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">{i + 1}</div>
+                                                                <span className="font-medium text-zinc-700 dark:text-zinc-300">{theme}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <p className="text-zinc-400 text-[14px]">No strong themes detected.</p>
+                                                )}
                                             </div>
                                             <div>
                                                 <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                                                    <MessageSquare className="w-5 h-5 text-blue-500" /> Verbatim Quotes
+                                                    <MessageSquare className="w-5 h-5 text-blue-500" /> Key Verbatim Quotes
                                                 </h3>
                                                 <div className="space-y-4">
-                                                    <blockquote className="border-l-4 border-blue-500 pl-4 py-1 text-[14px] text-zinc-600 dark:text-zinc-400 italic">
-                                                        "I literally couldn't figure out where the save button was, it felt extremely disorganized inside the editor."
-                                                    </blockquote>
-                                                    <blockquote className="border-l-4 border-emerald-500 pl-4 py-1 text-[14px] text-zinc-600 dark:text-zinc-400 italic">
-                                                        "But once we accessed the new timeline view, everything clicked. That is exactly what our team needs to buy this."
-                                                    </blockquote>
+                                                    {selectedItem.quotes && selectedItem.quotes.length > 0 ? (
+                                                        selectedItem.quotes.map((q, i) => (
+                                                            <blockquote
+                                                                key={i}
+                                                                className={`border-l-4 pl-4 py-1 text-[14px] text-zinc-600 dark:text-zinc-400 italic ${q.sentiment === 'positive' ? 'border-emerald-500' :
+                                                                        q.sentiment === 'negative' ? 'border-red-500' : 'border-blue-500'
+                                                                    }`}
+                                                            >
+                                                                "{q.text}"
+                                                            </blockquote>
+                                                        ))
+                                                    ) : (
+                                                        <p className="text-zinc-400 text-[14px]">No notable quotes extracted.</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

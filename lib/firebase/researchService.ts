@@ -77,16 +77,20 @@ export const uploadResearchDocument = async (workspaceId: string, uploaderId: st
         fileName: file.name,
     });
 
-    // 4. Mock AI Analysis Delay (This would be an API call to Python backend)
-    setTimeout(async () => {
-        const itemRef = doc(db, 'research', newDocId);
-        await updateDoc(itemRef, {
-            status: 'analyzed',
-            summary: "AI Simulated Summary: User sentiment highlights the need for a faster workflow. They complained about the UI complexity but loved the new dashboard analytics.",
-            sentiment: Math.random() > 0.5 ? 'positive' : 'mixed',
-            updatedAt: new Date()
-        });
-    }, 7000); // Wait 7 seconds then turn green in the UI
+    // 4. Real AI Analysis — call the Module 5 analysis pipeline
+    // This is fire-and-forget from the client side; the API updates Firestore when done.
+    fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            itemId: newDocId,
+            workspaceId,
+            localFilePath: downloadUrl, // e.g. /api/files/{workspaceId}/{fileName}
+            fileName: file.name,
+        }),
+    }).then(res => res.json())
+        .then(result => { if (!result.success) console.error('[ANALYZE FAILED]', result.error); })
+        .catch(err => console.error('[ANALYZE NETWORK ERROR]', err));
 
     return newDocId;
 };
