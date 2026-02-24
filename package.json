@@ -12,6 +12,7 @@
     "@types/natural": "^5.1.5",
     "@types/pdf-parse": "^1.1.5",
     "chart.js": "^4.5.1",
+    "chromadb": "^3.3.1",
     "clsx": "^2.1.1",
     "firebase": "^12.9.0",
     "firebase-admin": "^13.6.1",

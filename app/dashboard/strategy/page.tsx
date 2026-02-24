@@ -5,17 +5,17 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import {
-    Lightbulb, Target, ChevronDown, Plus, Trash2, Loader2,
-    ShieldAlert, Sparkles, CheckCircle2, FileText, ArrowRight, BarChart2, Cpu
+    Lightbulb, Target, ChevronDown, Loader2,
+    ShieldAlert, Sparkles, FileText, ArrowRight, BarChart2, Cpu, Zap
 } from "lucide-react";
 import { getResearchByWorkspace } from "@/lib/firebase/researchService";
-import { collection, addDoc, getDocs, query, where, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ResearchItem } from "@/types/research";
 
 // =====================================================================
 // MODULE 6: STRATEGY PLANNER
 // Converts analyzed research into Hypotheses → User Stories → OKRs
+// Powered by: Ollama / Qwen LLM via /api/generate
 // =====================================================================
 
 interface Hypothesis {
@@ -35,65 +35,28 @@ interface Strategy {
     hypothesis: Hypothesis;
     userStories: string[];
     okrs: { objective: string; keyResults: string[] }[];
+    source?: 'ollama' | 'template';
+    ollamaModel?: string | null;
 }
 
-// =====================================================================
-// LOCAL STRATEGY GENERATOR (Module 6 Core Logic)
-// In production: send to Ollama/Llama3 via /api/generate
-// =====================================================================
-function generateStrategyFromResearch(items: ResearchItem[]): Strategy | null {
-    const analyzedItems = items.filter(i => i.status === 'analyzed' && i.themes);
-    if (analyzedItems.length === 0) return null;
-
-    // Count theme frequency across all analyzed items
+// ── Helper: Build top theme from analyzed items ──────────────────────
+function getTopTheme(items: ResearchItem[]): { theme: string; count: number; total: number } | null {
+    const analyzed = items.filter(i => i.status === 'analyzed' && i.themes?.length);
+    if (analyzed.length === 0) return null;
     const themeCount: Record<string, number> = {};
-    for (const item of analyzedItems) {
+    for (const item of analyzed) {
         for (const theme of (item.themes || [])) {
             themeCount[theme] = (themeCount[theme] || 0) + 1;
         }
     }
+    const top = Object.entries(themeCount).sort((a, b) => b[1] - a[1])[0];
+    if (!top) return null;
+    return { theme: top[0], count: top[1], total: analyzed.length };
+}
 
-    // Pick the most common theme
-    const topTheme = Object.entries(themeCount).sort((a, b) => b[1] - a[1])[0];
-    if (!topTheme) return null;
-
-    const topThemeName = topTheme[0];
-    const positiveItems = analyzedItems.filter(i => i.sentiment === 'positive').length;
-    const confidenceLevel: 'low' | 'medium' | 'high' =
-        analyzedItems.length >= 5 ? 'high' :
-            analyzedItems.length >= 2 ? 'medium' : 'low';
-
-    const hypothesis: Hypothesis = {
-        id: `hyp_${Date.now()}`,
-        workspaceId: '',
-        title: `Improve ${topThemeName}`,
-        solution: `redesign and simplify the ${topThemeName.toLowerCase()} experience`,
-        benefit: `user satisfaction and task completion rate will increase by 30%`,
-        need: `${topThemeName} appeared in ${topTheme[1]}/${analyzedItems.length} research items as a top concern`,
-        confidence: confidenceLevel,
-        sourceResearchIds: analyzedItems.map(i => i.id),
-        status: 'draft',
-        createdAt: new Date(),
-    };
-
-    const userStories = [
-        `As a new user, I want a clear ${topThemeName.toLowerCase()} walkthrough so I can complete my first task without confusion.`,
-        `As a product manager, I want to see real-time metrics on ${topThemeName.toLowerCase()} so I can identify and resolve bottlenecks.`,
-        `As a team member, I want streamlined ${topThemeName.toLowerCase()} workflows so I can collaborate efficiently without friction.`,
-    ];
-
-    const okrs = [
-        {
-            objective: `Resolve the top user pain point: ${topThemeName}`,
-            keyResults: [
-                `Reduce user-reported issues related to ${topThemeName.toLowerCase()} by 50% by Q2`,
-                `Increase NPS score from baseline by +15 points within 60 days of launch`,
-                `Achieve 80% task completion rate on redesigned flow (measured in user testing)`,
-            ]
-        }
-    ];
-
-    return { hypothesis, userStories, okrs };
+// ── Confidence level based on data volume ─────────────────────────────
+function getConfidence(analyzedCount: number): 'low' | 'medium' | 'high' {
+    return analyzedCount >= 5 ? 'high' : analyzedCount >= 2 ? 'medium' : 'low';
 }
 
 export default function StrategyPlannerPage() {
@@ -104,30 +67,86 @@ export default function StrategyPlannerPage() {
     const [strategy, setStrategy] = useState<Strategy | null>(null);
     const [generating, setGenerating] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [generateError, setGenerateError] = useState('');
     const [expandedSection, setExpandedSection] = useState<string | null>('hypothesis');
+
+    // ── Call /api/generate (Ollama/Qwen) to build strategy ──────────
+    const callGenerateAPI = async (items: ResearchItem[]): Promise<Strategy | null> => {
+        const analyzed = items.filter(i => i.status === 'analyzed' && i.themes?.length);
+        if (analyzed.length === 0) return null;
+
+        const topThemeData = getTopTheme(items);
+        if (!topThemeData) return null;
+
+        const researchSummaries = analyzed
+            .map(i => i.summary || i.content || '')
+            .filter(Boolean);
+
+        const confidence = getConfidence(analyzed.length);
+
+        const res = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                topTheme: topThemeData.theme,
+                researchSummaries,
+                analyzedCount: analyzed.length,
+                workspaceId: activeWorkspace?.id || '',
+            }),
+        });
+
+        if (!res.ok) throw new Error(`Strategy generation failed: ${res.status}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'API error');
+
+        const { hypothesis, userStories, okrs } = data.strategy;
+        return {
+            hypothesis: {
+                id: `hyp_${Date.now()}`,
+                workspaceId: activeWorkspace?.id || '',
+                title: hypothesis.title,
+                solution: hypothesis.solution,
+                benefit: hypothesis.benefit,
+                need: hypothesis.need,
+                confidence,
+                sourceResearchIds: analyzed.map(i => i.id),
+                status: 'draft',
+                createdAt: new Date(),
+            },
+            userStories: userStories || [],
+            okrs: okrs || [],
+            source: data.source,
+            ollamaModel: data.ollamaModel,
+        };
+    };
 
     useEffect(() => {
         if (!activeWorkspace) { setLoading(false); return; }
         getResearchByWorkspace(activeWorkspace.id)
-            .then(items => {
+            .then(async items => {
                 setResearchItems(items);
-                // If there's analyzed research, auto-generate a preview strategy
                 const analyzed = items.filter(i => i.status === 'analyzed');
                 if (analyzed.length > 0) {
-                    const gen = generateStrategyFromResearch(items);
-                    if (gen) setStrategy(gen);
+                    try {
+                        const gen = await callGenerateAPI(items);
+                        if (gen) setStrategy(gen);
+                    } catch { /* silent on auto-load */ }
                 }
             })
             .finally(() => setLoading(false));
     }, [activeWorkspace]);
 
-    const handleGenerateStrategy = () => {
+    const handleGenerateStrategy = async () => {
         setGenerating(true);
-        setTimeout(() => {
-            const gen = generateStrategyFromResearch(researchItems);
+        setGenerateError('');
+        try {
+            const gen = await callGenerateAPI(researchItems);
             setStrategy(gen);
+        } catch (err: any) {
+            setGenerateError(err.message || 'Strategy generation failed');
+        } finally {
             setGenerating(false);
-        }, 1500);
+        }
     };
 
     const analyzedCount = researchItems.filter(i => i.status === 'analyzed').length;
@@ -195,12 +214,44 @@ export default function StrategyPlannerPage() {
                     className="shrink-0 flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold text-[14px] rounded-2xl shadow-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                     {generating ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Asking Qwen...</>
                     ) : (
                         <><Sparkles className="w-4 h-4" /> Generate Strategy</>
                     )}
                 </button>
             </motion.div>
+
+            {/* AI Source Badge */}
+            {strategy?.source && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 flex items-center gap-2"
+                >
+                    {strategy.source === 'ollama' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[12px] font-bold">
+                            <Zap className="w-3.5 h-3.5" />
+                            Generated by Qwen ({strategy.ollamaModel || 'qwen2.5'}) via Ollama
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-500 text-[12px] font-bold">
+                            <Cpu className="w-3.5 h-3.5" />
+                            Template Strategy (Start Ollama for AI generation)
+                        </span>
+                    )}
+                </motion.div>
+            )}
+
+            {/* Error Toast */}
+            {generateError && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-[13px] font-bold flex items-center gap-2"
+                >
+                    ⚠ {generateError}
+                </motion.div>
+            )}
 
             {loading ? (
                 <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 text-zinc-400 animate-spin" /></div>
@@ -252,8 +303,8 @@ export default function StrategyPlannerPage() {
                                         <div className="flex items-center gap-3">
                                             <span className="text-[12px] font-bold text-zinc-500 uppercase tracking-wider">Confidence Level:</span>
                                             <span className={`px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wider border ${strategy.hypothesis.confidence === 'high' ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-500/20' :
-                                                    strategy.hypothesis.confidence === 'medium' ? 'bg-orange-100 dark:bg-orange-500/10 text-orange-600 border-orange-200 dark:border-orange-500/20' :
-                                                        'bg-zinc-100 dark:bg-white/5 text-zinc-500 border-zinc-200 dark:border-white/10'
+                                                strategy.hypothesis.confidence === 'medium' ? 'bg-orange-100 dark:bg-orange-500/10 text-orange-600 border-orange-200 dark:border-orange-500/20' :
+                                                    'bg-zinc-100 dark:bg-white/5 text-zinc-500 border-zinc-200 dark:border-white/10'
                                                 }`}>
                                                 {strategy.hypothesis.confidence}
                                             </span>

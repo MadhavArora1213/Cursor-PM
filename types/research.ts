@@ -3,6 +3,13 @@ export interface ResearchQuote {
     sentiment: 'positive' | 'negative' | 'neutral';
 }
 
+export interface ResearchAIMeta {
+    summarySource?: 'ollama' | 'extractive';
+    transcriptionSource?: 'whisper' | 'pdf' | 'text' | 'placeholder';
+    ollamaModel?: string | null;
+    chromaIndexed?: boolean;
+}
+
 export interface ResearchItem {
     id: string;
     workspaceId: string;
@@ -21,7 +28,9 @@ export interface ResearchItem {
     fileUrl?: string;
     fileName?: string;
     content?: string;
+    // Module 5 AI Service tracking
+    vectorized?: boolean;
+    aiMeta?: ResearchAIMeta;
     createdAt: Date;
     updatedAt: Date;
 }
-

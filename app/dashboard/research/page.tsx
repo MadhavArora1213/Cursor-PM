@@ -360,9 +360,20 @@ export default function ResearchIntelligencePage() {
                                     <div>
                                         <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white pr-8">{selectedItem.title}</h2>
                                         <div className="flex flex-wrap items-center gap-3 mt-2 text-[13px] font-medium text-zinc-500">
-                                            <span className="flex items-center gap-1"><Cpu className="w-3.5 h-3.5" /> VADER & Llama 3 Analysis</span>
+                                            <span className="flex items-center gap-1">
+                                                <Cpu className="w-3.5 h-3.5" />
+                                                {selectedItem.aiMeta?.summarySource === 'ollama'
+                                                    ? `Qwen (${selectedItem.aiMeta.ollamaModel || 'qwen2.5'}) + VADER`
+                                                    : 'VADER + Extractive Analysis'}
+                                            </span>
                                             <div className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
                                             <span>{selectedItem.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            {selectedItem.vectorized && (
+                                                <>
+                                                    <div className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                                                    <span className="text-blue-500">ChromaDB Indexed</span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -450,7 +461,7 @@ export default function ResearchIntelligencePage() {
                                                             <blockquote
                                                                 key={i}
                                                                 className={`border-l-4 pl-4 py-1 text-[14px] text-zinc-600 dark:text-zinc-400 italic ${q.sentiment === 'positive' ? 'border-emerald-500' :
-                                                                        q.sentiment === 'negative' ? 'border-red-500' : 'border-blue-500'
+                                                                    q.sentiment === 'negative' ? 'border-red-500' : 'border-blue-500'
                                                                     }`}
                                                             >
                                                                 "{q.text}"
