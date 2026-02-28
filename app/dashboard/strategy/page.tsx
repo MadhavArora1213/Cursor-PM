@@ -6,11 +6,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import {
     Lightbulb, Target, ChevronDown, Loader2,
-    ShieldAlert, Sparkles, FileText, ArrowRight, BarChart2, Cpu, Zap
+    ShieldAlert, Sparkles, FileText, ArrowRight, BarChart2, Cpu, Zap, GripVertical
 } from "lucide-react";
 import { getResearchByWorkspace } from "@/lib/firebase/researchService";
 import { db } from "@/lib/firebase/config";
 import { ResearchItem } from "@/types/research";
+import { ReactSortable } from "react-sortablejs";
+import { Doughnut, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
+
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 // =====================================================================
 // MODULE 6: STRATEGY PLANNER
@@ -33,7 +38,7 @@ interface Hypothesis {
 
 interface Strategy {
     hypothesis: Hypothesis;
-    userStories: string[];
+    userStories: { id: string; text: string; priority: 'high' | 'medium' | 'low' }[];
     okrs: { objective: string; keyResults: string[] }[];
     source?: 'ollama' | 'template';
     ollamaModel?: string | null;
@@ -113,7 +118,11 @@ export default function StrategyPlannerPage() {
                 status: 'draft',
                 createdAt: new Date(),
             },
-            userStories: userStories || [],
+            userStories: (userStories || []).map((text: string, i: number) => ({
+                id: `story-${Date.now()}-${i}`,
+                text,
+                priority: i === 0 ? 'high' : i === 1 ? 'medium' : 'low'
+            })),
             okrs: okrs || [],
             source: data.source,
             ollamaModel: data.ollamaModel,
@@ -341,14 +350,60 @@ export default function StrategyPlannerPage() {
                                     className="overflow-hidden"
                                 >
                                     <div className="px-6 sm:px-8 pb-8 space-y-3 border-t border-zinc-200/50 dark:border-white/10 pt-6">
-                                        {strategy.userStories.map((story, i) => (
-                                            <div key={i} className="flex items-start gap-3 p-4 rounded-2xl border border-zinc-200/50 dark:border-white/5 bg-zinc-50 dark:bg-white/2 hover:border-blue-400/50 transition-colors">
-                                                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
-                                                    {i + 1}
-                                                </div>
-                                                <p className="text-[14px] text-zinc-700 dark:text-zinc-300 leading-relaxed">{story}</p>
+                                        <div className="flex flex-col lg:flex-row gap-8">
+
+                                            {/* Roadmap Drag and Drop */}
+                                            <div className="flex-1 space-y-3">
+                                                <h3 className="text-[13px] font-bold text-zinc-500 uppercase tracking-wider mb-4">Roadmap Prioritization (Drag &amp; Drop)</h3>
+                                                <ReactSortable
+                                                    list={strategy.userStories}
+                                                    setList={(newList) => setStrategy({ ...strategy, userStories: newList })}
+                                                    animation={200}
+                                                    className="space-y-3"
+                                                >
+                                                    {strategy.userStories.map((story, i) => (
+                                                        <div key={story.id} className="flex items-start gap-4 p-4 rounded-2xl border border-zinc-200/50 dark:border-white/5 bg-zinc-50 dark:bg-white/2 hover:border-blue-400/50 transition-colors cursor-grab active:cursor-grabbing">
+                                                            <GripVertical className="w-5 h-5 text-zinc-300 dark:text-zinc-600 shrink-0 mt-0.5" />
+                                                            <div className="flex-1">
+                                                                <p className="text-[14px] text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium">{story.text}</p>
+                                                            </div>
+                                                            <div className="shrink-0 flex items-center justify-center">
+                                                                {i === 0 ? (
+                                                                    <span className="px-2 py-1 rounded bg-red-100 text-red-600 text-[10px] font-bold uppercase">P1 / Sprint 1</span>
+                                                                ) : i === 1 ? (
+                                                                    <span className="px-2 py-1 rounded bg-orange-100 text-orange-600 text-[10px] font-bold uppercase">P2 / Sprint 1</span>
+                                                                ) : (
+                                                                    <span className="px-2 py-1 rounded bg-zinc-100 text-zinc-500 text-[10px] font-bold uppercase">Backlog</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </ReactSortable>
                                             </div>
-                                        ))}
+
+                                            {/* Chart.js Distribution */}
+                                            <div className="w-full lg:w-64 shrink-0 flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-[#111] rounded-2xl border border-zinc-100 dark:border-white/5">
+                                                <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-4">Sprint Allocation</h3>
+                                                <div className="w-40 h-40">
+                                                    <Doughnut
+                                                        data={{
+                                                            labels: ['P1 (Sprint 1)', 'P2 (Sprint 1)', 'Backlog'],
+                                                            datasets: [{
+                                                                data: [1, 1, strategy.userStories.length > 2 ? strategy.userStories.length - 2 : 0],
+                                                                backgroundColor: ['#ef4444', '#f97316', '#a1a1aa'],
+                                                                borderWidth: 0,
+                                                                hoverOffset: 4
+                                                            }]
+                                                        }}
+                                                        options={{
+                                                            cutout: '75%',
+                                                            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}

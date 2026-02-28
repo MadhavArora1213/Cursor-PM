@@ -18,10 +18,11 @@ let collection: Collection | null = null;
  */
 export async function checkChromaHealth(): Promise<boolean> {
     try {
+        // Ping the root or heartbeat, ignoring 410 Unimplemented as it still means the server is accessible
         const res = await fetch(`${CHROMA_URL}/api/v1/heartbeat`, {
             signal: AbortSignal.timeout(3000),
         });
-        return res.ok;
+        return res.ok || res.status === 410 || res.status === 404;
     } catch {
         return false;
     }

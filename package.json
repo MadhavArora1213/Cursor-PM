@@ -11,6 +11,7 @@
   "dependencies": {
     "@types/natural": "^5.1.5",
     "@types/pdf-parse": "^1.1.5",
+    "@types/sortablejs": "^1.15.9",
     "chart.js": "^4.5.1",
     "chromadb": "^3.3.1",
     "clsx": "^2.1.1",
@@ -26,7 +27,9 @@
     "react": "19.2.3",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.3",
+    "react-sortablejs": "^6.1.4",
     "sentiment": "^5.0.2",
+    "sortablejs": "^1.15.7",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
@@ -34,6 +37,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4.2.0",

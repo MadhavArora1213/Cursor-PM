@@ -54,10 +54,17 @@ async function transcribeWithWhisper(audioPath: string): Promise<{ text: string;
         join(process.cwd(), 'whisper.cpp', 'build', 'bin', 'whisper-cli'), // Windows cmake build
         join(process.cwd(), 'whisper.cpp', 'main'),                         // Linux/Mac default
         join(process.cwd(), 'whisper.cpp', 'main.exe'),                     // Windows alternative
+        join(process.cwd(), '..', 'whisper.cpp', 'main'),                   // Parent dir fallback
+        join(process.cwd(), '..', 'whisper.cpp', 'main.exe'),               // Parent dir fallback (Windows)
         'whisper-cli',                                                        // System PATH
     ];
 
-    const modelPath = join(process.cwd(), 'whisper.cpp', 'models', 'ggml-base.en.bin');
+    let modelPath = join(process.cwd(), 'whisper.cpp', 'models', 'ggml-base.en.bin');
+    if (!fs.existsSync(modelPath)) {
+        // Fallback to parent directory if it was cloned outside the project root
+        modelPath = join(process.cwd(), '..', 'whisper.cpp', 'models', 'ggml-base.en.bin');
+    }
+
     const outputTxtPath = audioPath.replace(/\.[^.]+$/, '.txt');
 
     // Look for a valid binary
@@ -152,14 +159,57 @@ function analyzeSentiment(text: string): {
     };
 }
 
-// ─────────────────────────────────────────────────────
-// TOOL 4: Hugging Face–style Zero-Shot Theme Classifier
-// Keyword buckets mapped to product intelligence categories.
-// Replace with: POST https://api-inference.huggingface.co/models/facebook/bart-large-mnli
-// ─────────────────────────────────────────────────────
-function extractThemes(text: string): string[] {
-    const lowerText = text.toLowerCase();
+async function extractThemes(text: string): Promise<string[]> {
+    const candidateLabels = [
+        'UI / UX Complexity', 'Performance & Speed', 'Onboarding & Learning Curve',
+        'Feature Requests', 'Pricing & Value', 'Collaboration & Teamwork',
+        'Data & Analytics', 'Integration & Compatibility', 'Reliability & Trust',
+        'Mobile Experience'
+    ];
 
+    // Try calling Hugging Face Free Inference API
+    try {
+        const response = await fetch(
+            "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli",
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    // NOTE: Without an API key, this uses the free/public rate limit.
+                    // For better reliability, users can add HF_API_KEY to their .env
+                    ...(process.env.HF_API_KEY ? { Authorization: `Bearer ${process.env.HF_API_KEY}` } : {})
+                },
+                method: "POST",
+                body: JSON.stringify({
+                    inputs: text.substring(0, 1000), // Limit text to avoid payload size errors
+                    parameters: { candidate_labels: candidateLabels }
+                }),
+            }
+        );
+
+        if (response.ok) {
+            const data = await response.json();
+            // Data format: { sequence: string, labels: string[], scores: number[] }
+            if (data && data.labels && data.scores) {
+                const themes: string[] = [];
+                for (let i = 0; i < data.labels.length; i++) {
+                    if (data.scores[i] > 0.4) { // Confidence threshold
+                        themes.push(data.labels[i]);
+                    }
+                }
+                if (themes.length > 0) {
+                    console.log(`[HF API] Successfully extracted themes: ${themes.slice(0, 3)}`);
+                    return themes.slice(0, 5);
+                }
+            }
+        } else {
+            console.warn(`[HF API] Failed with status ${response.status}. Falling back to NLP keywords.`);
+        }
+    } catch (e) {
+        console.warn("[HF API] Network error. Falling back to NLP keywords.", e);
+    }
+
+    // FALLBACK: NLP Keyword buckets
+    const lowerText = text.toLowerCase();
     const themeBuckets: { theme: string; keywords: string[] }[] = [
         { theme: 'UI / UX Complexity', keywords: ['confusing', 'hard to find', 'complicated', 'cluttered', 'overwhelming', 'difficult', 'button', 'navigate', 'interface', 'design', 'layout', 'unclear'] },
         { theme: 'Performance & Speed', keywords: ['slow', 'lag', 'loading', 'crash', 'freezes', 'timeout', 'latency', 'fast', 'speed', 'performance', 'response time'] },
@@ -307,7 +357,7 @@ export async function POST(req: Request) {
 
         // ── STEP 3: THEMES (TOOL 4 – HF-style classifier) ───
         console.log(`[ANALYZE] Extracting themes...`);
-        const themes = extractThemes(rawText);
+        const themes = await extractThemes(rawText);
 
         // ── STEP 4: SUMMARIZATION (TOOL 5 – Ollama/Qwen) ────
         let summary: string;
