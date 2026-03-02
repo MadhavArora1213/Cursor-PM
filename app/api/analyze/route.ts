@@ -29,8 +29,20 @@ async function extractTextFromFile(filePath: string, ext: string): Promise<strin
     const fileBuffer = await readFile(filePath);
 
     if (ext === '.pdf') {
-        const pdfParse = require('pdf-parse');
-        const data = await pdfParse(fileBuffer);
+        // Mock DOMMatrix and DOMPoint to prevent pdf-parse/pdf.js from crashing in Node environments
+        if (typeof global !== 'undefined') {
+            if (typeof (global as any).DOMMatrix === 'undefined') {
+                (global as any).DOMMatrix = class DOMMatrix { };
+            }
+            if (typeof (global as any).DOMPoint === 'undefined') {
+                (global as any).DOMPoint = class DOMPoint { };
+            }
+        }
+
+        const { PDFParse } = require('pdf-parse');
+        const parser = new PDFParse({ data: fileBuffer });
+        const data = await parser.getText();
+        await parser.destroy();
         return data.text;
     }
 

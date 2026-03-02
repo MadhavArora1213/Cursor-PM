@@ -16,10 +16,12 @@ import {
 } from "lucide-react";
 import { uploadResearchDocument, getResearchByWorkspace, deleteResearchItem } from "@/lib/firebase/researchService";
 import { ResearchItem } from "@/types/research";
+import { useRouter } from "next/navigation";
 
 export default function ResearchIntelligencePage() {
     const { user } = useAuth();
     const { activeWorkspace } = useWorkspace();
+    const router = useRouter();
 
     const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
     const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
@@ -496,7 +498,9 @@ export default function ResearchIntelligencePage() {
                                 >
                                     Close Report
                                 </button>
-                                <button className="px-6 py-2.5 rounded-xl font-bold bg-zinc-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity shadow-lg">
+                                <button
+                                    onClick={() => router.push('/dashboard/strategy')}
+                                    className="px-6 py-2.5 rounded-xl font-bold bg-zinc-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity shadow-lg">
                                     Turn into Strategy ➔
                                 </button>
                             </div>
