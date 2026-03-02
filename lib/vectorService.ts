@@ -28,6 +28,41 @@ export async function checkChromaHealth(): Promise<boolean> {
     }
 }
 
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5';
+
+/**
+ * Custom embedding function using our local Ollama instance.
+ * Completely bypasses @chroma-core/default-embed which crashes Turbopack next build.
+ */
+const ollamaEmbeddingFunction = {
+    generate: async (texts: string[]): Promise<number[][]> => {
+        const embeddings: number[][] = [];
+        for (const text of texts) {
+            try {
+                const res = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: DEFAULT_MODEL, prompt: text })
+                });
+
+                if (!res.ok) {
+                    console.warn(`[EMBEDDING ERROR] Failed to generate embedding with Ollama status: ${res.status}`);
+                    // Fallback to a zero-vector so indexing doesn't completely crash the whole process
+                    embeddings.push(Array(3584).fill(0.01));
+                    continue;
+                }
+                const data = await res.json();
+                embeddings.push(data.embedding);
+            } catch (err) {
+                console.warn(`[EMBEDDING ERROR] Network error hitting Ollama:`, err);
+                embeddings.push(Array(3584).fill(0.01)); // Fallback dimensionality
+            }
+        }
+        return embeddings;
+    }
+};
+
 /**
  * Initialize ChromaDB client and get/create the research collection.
  * This is safe to call multiple times (idempotent).
@@ -36,17 +71,35 @@ async function getCollection(): Promise<Collection> {
     if (collection) return collection;
 
     if (!client) {
-        client = new ChromaClient({ path: CHROMA_URL });
+        // Parse CHROMA_URL to avoid deprecated 'path' parameter warning
+        const urlParams = new URL(CHROMA_URL);
+        client = new ChromaClient({
+            host: urlParams.hostname,
+            port: parseInt(urlParams.port) || 8000,
+            ssl: urlParams.protocol === 'https:'
+        });
     }
 
     try {
+        // ChromaDB statically logs an unsuppressable warning if you bypass their default heavy 
+        // transformers-based embedding system. We temporarily silence console.warn since we 
+        // explicitly compute and pass raw float arrays down below anyway.
+        const originalWarn = console.warn;
+        console.warn = (...args) => {
+            if (typeof args[0] === 'string' && args[0].includes('No embedding function configuration found')) return;
+            originalWarn(...args);
+        };
+
         collection = await client.getOrCreateCollection({
             name: COLLECTION_NAME,
+            embeddingFunction: ollamaEmbeddingFunction,
             metadata: {
                 description: 'Product research documents for semantic search',
                 'hnsw:space': 'cosine',
             },
         });
+
+        console.warn = originalWarn; // Restore warnings immediately
     } catch (err) {
         throw new Error(`ChromaDB connection failed: ${String(err)}`);
     }
@@ -69,10 +122,14 @@ export async function upsertResearchDocument(
 ): Promise<void> {
     const col = await getCollection();
 
+    const documentText = text.substring(0, 8000);
+    const embeddings = await ollamaEmbeddingFunction.generate([documentText]);
+
     // ChromaDB upsert: add if not exists, update if exists
     await col.upsert({
         ids: [id],
-        documents: [text.substring(0, 8000)], // Cap at 8k chars
+        documents: [documentText], // Cap at 8k chars
+        embeddings: embeddings,
         metadatas: [{ ...metadata, indexedAt: new Date().toISOString() }],
     });
 }
@@ -115,8 +172,10 @@ export async function semanticSearch(
         ? { workspaceId: { $eq: workspaceId } }
         : undefined;
 
+    const queryEmbeddings = await ollamaEmbeddingFunction.generate([query]);
+
     const results = await col.query({
-        queryTexts: [query],
+        queryEmbeddings: queryEmbeddings,
         nResults,
         where: whereClause as any,
         include: ['documents', 'distances', 'metadatas'] as any,

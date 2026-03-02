@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@huggingface/inference": "^4.13.14",
     "@types/natural": "^5.1.5",
     "@types/pdf-parse": "^1.1.5",
     "@types/sortablejs": "^1.15.9",
@@ -27,7 +28,9 @@
     "react": "19.2.3",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0",
     "react-sortablejs": "^6.1.4",
+    "remark-gfm": "^4.0.1",
     "sentiment": "^5.0.2",
     "sortablejs": "^1.15.7",
     "tailwind-merge": "^3.5.0"

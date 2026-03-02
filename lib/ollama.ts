@@ -19,67 +19,156 @@ export interface OllamaResponse {
 
 /**
  * Check if Ollama is running and which model is available.
+ * Prioritizes smaller/faster "3b" or "1.5b" models to prevent 5+ minute generation times on typical hardware.
  */
 export async function checkOllamaHealth(): Promise<{ available: boolean; model: string }> {
     try {
         const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`, {
             method: 'GET',
             signal: AbortSignal.timeout(3000),
+            cache: 'no-store'
         });
         if (!res.ok) return { available: false, model: DEFAULT_MODEL };
 
         const data = await res.json();
         const models: { name: string }[] = data.models || [];
+
+        // 1. Try to find the ultra-fast 3b or 1.5b sizes first
+        const fastModel = models.find((m) => m.name.includes('3b') || m.name.includes('1.5b') || m.name.includes('0.5b'));
+        // 2. Otherwise grab any Qwen model
         const qwenModel = models.find((m) => m.name.toLowerCase().startsWith('qwen'));
-        const bestModel = qwenModel?.name || models[0]?.name || DEFAULT_MODEL;
+
+        const bestModel = fastModel?.name || qwenModel?.name || models[0]?.name || DEFAULT_MODEL;
         return { available: models.length > 0, model: bestModel };
     } catch {
         return { available: false, model: DEFAULT_MODEL };
     }
 }
 
+import * as http from 'http';
+
 /**
  * Core generate function — sends a prompt to Ollama and returns response text.
+ * Uses native Node http to completely bypass Next.js unconfigurable 5-minute Undici fetch timeout.
  */
 export async function ollamaGenerate(prompt: string, model: string = DEFAULT_MODEL): Promise<string> {
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model,
-            prompt,
-            stream: false,
-            options: {
-                temperature: 0.4,
-                top_p: 0.9,
-                num_predict: 800,
-            },
-        }),
-        signal: AbortSignal.timeout(90_000),
+    return new Promise((resolve, reject) => {
+        try {
+            const url = new URL(`${OLLAMA_BASE_URL}/api/generate`);
+
+            const req = http.request(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 0 // Disable socket timeout completely
+            }, (res: http.IncomingMessage) => {
+                if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+                    let errData = '';
+                    res.on('data', chunk => { errData += chunk.toString(); });
+                    res.on('end', () => reject(new Error(`Ollama error (${res.statusCode}): ${errData}`)));
+                    return;
+                }
+
+                let fullResponse = '';
+                let buffer = '';
+
+                res.on('data', (chunk) => {
+                    buffer += chunk.toString('utf-8');
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.response) {
+                                fullResponse += parsed.response;
+                            }
+                        } catch (e) {
+                            // Ignore partial chunks
+                        }
+                    }
+                });
+
+                res.on('end', () => {
+                    if (buffer.trim()) {
+                        try {
+                            const parsed = JSON.parse(buffer);
+                            if (parsed.response) fullResponse += parsed.response;
+                        } catch (e) { }
+                    }
+                    resolve(fullResponse.trim());
+                });
+
+                res.on('error', (err) => reject(new Error('Streaming error from Ollama: ' + err.message)));
+            });
+
+            req.on('error', (err) => reject(new Error('Network error connecting to Ollama: ' + err.message)));
+            req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('Ollama connection timed out.'));
+            });
+
+            req.write(JSON.stringify({
+                model,
+                prompt,
+                stream: true,
+                options: {
+                    temperature: 0.4,
+                    top_p: 0.9,
+                    num_predict: 1000, // Explicitly allow larger generation
+                },
+            }));
+
+            req.end();
+
+        } catch (err: any) {
+            reject(new Error('Failed to initialize Ollama request: ' + err.message));
+        }
     });
-
-    if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`Ollama error (${res.status}): ${err}`);
-    }
-
-    const data: OllamaResponse = await res.json();
-    return data.response?.trim() || '';
 }
 
 /**
  * Summarize research text using Qwen — returns concise executive summary.
  */
 export async function summarizeWithOllama(text: string): Promise<string> {
-    const truncated = text.substring(0, 4000);
-    const prompt = `You are an expert product manager analyst. Read the following user research text and provide a concise executive summary in 2-4 sentences. Focus on: key user pain points, positive feedback, and actionable insights. Do NOT include any preamble — just write the summary directly.
+    const truncated = text.substring(0, 4500); // Reduce context window to improve CPU latency
+    const prompt = `System Role Configuration:
+You are an elite, world-class Product Manager and Lead Analyst. Your analytical capabilities are legendary, and you excel at taking complex, unstructured documents (whether they are user research transcripts, functional specs, market analysis, or technical documentation) and distilling them into highly readable, universally valuable intelligence reports.
 
-Research Text:
+Core Directive:
+Explain and summarize the provided document. Extract the undeniable signal from the noise. Your output must be a masterfully structured Markdown report so profound, clear, and immediately actionable that any team member can read it and instantly understand the document's core value.
+
+Required Output Architecture (Strictly adhere to this Markdown format):
+
+## 📄 1. Executive Summary
+*(Write 3-4 masterful sentences explaining exactly what this document is, its primary focus, and why it matters. Frame the core narrative.)*
+
+## 💡 2. Key Themes & Main Ideas
+*(Identify the top 3-4 most critical themes, findings, or concepts from the text. Explain them clearly.)*
+- **[Theme Name]**: [Deep description of the concept or finding based purely on the text.]
+- **[Theme Name]**: [Deep description...]
+
+## 📊 3. Crucial Details & Evidence
+*(Extract the most powerful data points, specific examples, or compelling quotes that support the overall document.)*
+- *[Detail/Quote/Data point 1]*
+- *[Detail/Quote/Data point 2]*
+
+## 🚀 4. Strategic Implications & Actionable Takeaways
+*(Translate the document's contents into undeniable action items, consequences, or strategic bets.)*
+- 🛠 **Tactical Takeaway**: [A clear, immediate next step, fix, or realization based on the text.]
+- 🗺️ **Strategic Implication**: [How this document should shape our broader roadmap or product vision.]
+
+Absolute Constraints:
+- Output ONLY the requested Markdown document. NO introductory greetings, NO conversational filler concluding the message.
+- You must write beautifully, concisely, and with extreme authority.
+- ALL insights must be irrefutably grounded in the provided text. Zero hallucinations.
+
+Raw Document Input:
 """
 ${truncated}
 """
 
-Executive Summary:`;
+Generate Universal Intelligence Report:`;
     return await ollamaGenerate(prompt);
 }
 

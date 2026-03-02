@@ -179,48 +179,50 @@ async function extractThemes(text: string): Promise<string[]> {
         'Mobile Experience'
     ];
 
-    // Try calling Hugging Face Free Inference API
-    try {
-        const response = await fetch(
-            "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli",
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    // NOTE: Without an API key, this uses the free/public rate limit.
-                    // For better reliability, users can add HF_API_KEY to their .env
-                    ...(process.env.HF_API_KEY ? { Authorization: `Bearer ${process.env.HF_API_KEY}` } : {})
-                },
-                method: "POST",
-                body: JSON.stringify({
-                    inputs: text.substring(0, 1000), // Limit text to avoid payload size errors
-                    parameters: { candidate_labels: candidateLabels }
-                }),
-            }
-        );
+    // 1. Only attempt HuggingFace Inference if an explicit API key exists.
+    // Public unauthenticated calls to this route almost always timeout or hit rate limits instantly.
+    if (process.env.HF_API_KEY) {
+        try {
+            const response = await fetch(
+                "https://router.huggingface.co/hf-inference/models/typeform/distilbert-base-uncased-mnli",
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${process.env.HF_API_KEY}`
+                    },
+                    method: "POST",
+                    body: JSON.stringify({
+                        inputs: text.substring(0, 1000), // Limit text to avoid payload size errors
+                        parameters: { candidate_labels: candidateLabels },
+                        options: { wait_for_model: true }
+                    }),
+                    signal: AbortSignal.timeout(15000), // Increased from 8s to 15s to allow HF models to wake up
+                }
+            );
 
-        if (response.ok) {
-            const data = await response.json();
-            // Data format: { sequence: string, labels: string[], scores: number[] }
-            if (data && data.labels && data.scores) {
-                const themes: string[] = [];
-                for (let i = 0; i < data.labels.length; i++) {
-                    if (data.scores[i] > 0.4) { // Confidence threshold
-                        themes.push(data.labels[i]);
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.labels && data.scores) {
+                    const themes: string[] = [];
+                    for (let i = 0; i < data.labels.length; i++) {
+                        if (data.scores[i] > 0.4) { // Confidence threshold
+                            themes.push(data.labels[i]);
+                        }
+                    }
+                    if (themes.length > 0) {
+                        console.log(`[HF API] Successfully extracted themes: ${themes.slice(0, 3)}`);
+                        return themes.slice(0, 5);
                     }
                 }
-                if (themes.length > 0) {
-                    console.log(`[HF API] Successfully extracted themes: ${themes.slice(0, 3)}`);
-                    return themes.slice(0, 5);
-                }
             }
-        } else {
-            console.warn(`[HF API] Failed with status ${response.status}. Falling back to NLP keywords.`);
+        } catch (e: any) {
+            console.warn("[HF API] Network error using key. Falling back to local NLP keywords.", e.message || 'Unknown error');
         }
-    } catch (e) {
-        console.warn("[HF API] Network error. Falling back to NLP keywords.", e);
+    } else {
+        console.log(`[HF API] Skipping HuggingFace remote inference (No HF_API_KEY found). Using fast local NLP keywords.`);
     }
 
-    // FALLBACK: NLP Keyword buckets
+    // FALLBACK: Fast Local NLP Keyword buckets
     const lowerText = text.toLowerCase();
     const themeBuckets: { theme: string; keywords: string[] }[] = [
         { theme: 'UI / UX Complexity', keywords: ['confusing', 'hard to find', 'complicated', 'cluttered', 'overwhelming', 'difficult', 'button', 'navigate', 'interface', 'design', 'layout', 'unclear'] },

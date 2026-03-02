@@ -14,9 +14,12 @@ import {
     Loader2, AlertCircle, Trash2, ShieldAlert, Cpu, Sparkles,
     FileAudio, FileIcon, File as FileGeneric, X, Play, Tag, MessageSquare
 } from "lucide-react";
+import Link from 'next/link';
 import { uploadResearchDocument, getResearchByWorkspace, deleteResearchItem } from "@/lib/firebase/researchService";
 import { ResearchItem } from "@/types/research";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function ResearchIntelligencePage() {
     const { user } = useAuth();
@@ -296,7 +299,7 @@ export default function ResearchIntelligencePage() {
                                     </div>
 
                                     <p className="text-[14px] text-zinc-500 dark:text-zinc-400 mb-4 line-clamp-2 leading-relaxed">
-                                        {item.summary || "AI Analysis pending. Telemetry data is currently being parsed and vectorized by the language model..."}
+                                        {item.summary ? item.summary.replace(/[#*`_~>-]/g, '').replace(/\n+/g, ' ').trim() : "AI Analysis pending. Telemetry data is currently being parsed and vectorized by the language model..."}
                                     </p>
 
                                     {/* Bottom Meta */}
@@ -427,8 +430,28 @@ export default function ResearchIntelligencePage() {
                                     <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-3 flex items-center gap-2">
                                         <Sparkles className="w-5 h-5 text-purple-500" /> Executive Summary
                                     </h3>
-                                    <div className="text-[15px] leading-relaxed text-zinc-700 dark:text-zinc-300 bg-purple-50 dark:bg-purple-500/5 border border-purple-100 dark:border-purple-500/10 p-5 rounded-3xl">
-                                        {selectedItem.summary || "Waiting for LLM analysis layer to complete parsing and generation..."}
+                                    <div className="text-[15px] leading-relaxed text-zinc-700 dark:text-zinc-300 bg-purple-50 dark:bg-purple-500/5 border border-purple-100 dark:border-purple-500/10 p-5 rounded-3xl overflow-hidden">
+                                        {selectedItem.summary ? (
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    h1: ({ node, ...props }) => <h1 className="text-2xl font-black mt-6 mb-4 text-zinc-900 dark:text-white" {...props} />,
+                                                    h2: ({ node, ...props }) => <h2 className="text-xl font-bold mt-6 mb-3 text-zinc-900 dark:text-white" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-lg font-bold mt-5 mb-2 text-zinc-900 dark:text-white" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-extrabold text-zinc-900 dark:text-white" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-2 marker:text-purple-500" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-2 marker:font-bold marker:text-zinc-900 dark:marker:text-white" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                                                    p: ({ node, ...props }) => <p className="mb-4 last:mb-0" {...props} />,
+                                                    blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-purple-500 pl-4 py-2 my-4 text-zinc-600 dark:text-zinc-400 italic bg-purple-500/5 rounded-r-lg" {...props} />,
+                                                    em: ({ node, ...props }) => <em className="text-purple-600 dark:text-purple-400 not-italic font-medium" {...props} />
+                                                }}
+                                            >
+                                                {selectedItem.summary}
+                                            </ReactMarkdown>
+                                        ) : (
+                                            "Waiting for LLM analysis layer to complete parsing and generation..."
+                                        )}
                                     </div>
                                 </div>
 
@@ -498,11 +521,12 @@ export default function ResearchIntelligencePage() {
                                 >
                                     Close Report
                                 </button>
-                                <button
-                                    onClick={() => router.push('/dashboard/strategy')}
-                                    className="px-6 py-2.5 rounded-xl font-bold bg-zinc-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity shadow-lg">
+                                <Link
+                                    href="/dashboard/strategy"
+                                    onClick={() => setSelectedItem(null)}
+                                    className="px-6 py-2.5 rounded-xl font-bold bg-zinc-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity shadow-lg flex items-center justify-center">
                                     Turn into Strategy ➔
-                                </button>
+                                </Link>
                             </div>
                         </motion.div>
                     </div>
