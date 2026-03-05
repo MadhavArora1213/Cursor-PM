@@ -1,21 +1,33 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { UserProfile } from "@/components/UserProfile";
-import { motion } from "framer-motion";
-import { TrendingUp, Users, Zap, Activity, ChevronRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  TrendingUp, Users, Zap, Activity, ChevronRight,
+  FileText, Sparkles, Layout, Lightbulb, Search,
+  BarChart3, Target, ArrowUpRight, Clock, MessageSquare
+} from "lucide-react";
+import { getDashboardStats } from "@/lib/firebase/statsService";
+import Link from "next/link";
 
 export default function Home() {
   const { user } = useAuth();
+  const { activeWorkspace } = useWorkspace();
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (activeWorkspace) {
+      getDashboardStats(activeWorkspace.id).then(setStats).finally(() => setLoading(false));
+    }
+  }, [activeWorkspace]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   };
 
   const itemVariants = {
@@ -23,10 +35,12 @@ export default function Home() {
     show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
   };
 
-  const stats = [
-    { label: 'Active Experiments', value: '4', trend: '+2 this week', icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { label: 'User Interviews', value: '12', trend: '+4 this week', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { label: 'Features Shipped', value: '8', trend: 'On track', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' }
+  const targetIcon = Target;
+
+  const dashboardCards = [
+    { label: 'Intelligence Repository', value: stats?.totalResearch || '0', sub: 'Research Items', icon: Search, color: 'text-blue-500', bg: 'bg-blue-500/10', href: '/dashboard/research' },
+    { label: 'Strategizing Engine', value: stats?.analyzedResearch || '0', sub: 'Analyses Complete', icon: targetIcon, color: 'text-purple-500', bg: 'bg-purple-500/10', href: '/dashboard/strategy' },
+    { label: 'Sentiment Pulse', value: `${stats?.avgSentiment || 0}%`, sub: 'Positive Feedback', icon: TrendingUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10', href: '/dashboard/research' }
   ];
 
   return (
@@ -34,106 +48,123 @@ export default function Home() {
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="max-w-[1200px] w-full mx-auto space-y-12 pb-20"
+      className="max-w-[1200px] w-full mx-auto space-y-10 pb-20"
     >
-      {/* Premium Header */}
-      <motion.header variants={itemVariants} className="flex flex-col relative">
-        <div className="absolute -top-20 -left-20 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none" />
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tighter text-zinc-900 dark:text-white">
-          Welcome back{user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}.
-        </h1>
-        <p className="mt-4 text-[16px] text-zinc-500 dark:text-zinc-400 max-w-2xl leading-relaxed font-medium">
-          Here's a pulse check on your product ecosystem. Manage your research, active experiments, and team workflows in one unified command center.
-        </p>
+      {/* 1. HERO HEADER */}
+      <motion.header variants={itemVariants} className="relative py-4">
+        <div className="absolute -top-10 -left-10 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full pointer-events-none" />
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-4">
+              <Sparkles className="w-3 h-3" /> Command Center v2.0
+            </div>
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tighter text-zinc-900 dark:text-white leading-[0.9]">
+              Welcome, {user?.displayName ? user.displayName.split(' ')[0] : 'Innovator'}.
+            </h1>
+            <p className="mt-4 text-lg text-zinc-500 dark:text-zinc-400 font-medium max-w-xl">
+              {activeWorkspace ? `Managing ${activeWorkspace.name}` : 'Select a workspace to begin discovering product truth.'}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Link href="/dashboard/canvas" className="group px-5 py-3 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-black font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-blue-500/10">
+              Launch Canvas <Layout className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+            </Link>
+          </div>
+        </div>
       </motion.header>
 
-      {/* Advanced Quick Stats */}
+      {/* 2. STATS GRID */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            whileHover={{ y: -5, scale: 1.02 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="relative p-6 rounded-[32px] bg-white dark:bg-[#0A0A0A] border border-zinc-200/50 dark:border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)] overflow-hidden group"
-          >
-            {/* Hover Gradient Effect */}
-            <div className="absolute inset-0 bg-linear-to-br from-white/40 to-white/0 dark:from-white/5 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-[32px] pointer-events-none" />
-
-            <div className="flex justify-between items-start mb-4">
-              <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center`}>
-                <stat.icon className={`w-6 h-6 ${stat.color}`} />
+        {dashboardCards.map((card, i) => (
+          <Link key={card.label} href={card.href}>
+            <motion.div
+              whileHover={{ y: -5, scale: 1.02 }}
+              className="relative p-7 rounded-[32px] bg-white dark:bg-[#0A0A0A] border border-zinc-200/50 dark:border-white/5 shadow-sm overflow-hidden group h-full"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className={`w-12 h-12 rounded-2xl ${card.bg} flex items-center justify-center`}>
+                  <card.icon className={`w-6 h-6 ${card.color}`} />
+                </div>
+                <ArrowUpRight className="w-5 h-5 text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" />
               </div>
-              <div className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase bg-zinc-100 dark:bg-white/5 ${stat.color}`}>
-                {stat.trend}
+              <div>
+                <div className="text-4xl font-black tracking-tight text-zinc-900 dark:text-white mb-1">{card.value}</div>
+                <div className="text-[14px] font-bold text-zinc-900 dark:text-zinc-100">{card.label}</div>
+                <div className="text-[12px] text-zinc-400 font-medium">{card.sub}</div>
               </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="text-5xl font-black tracking-tighter text-zinc-900 dark:text-white mb-2">{stat.value}</div>
-              <div className="text-[14px] font-semibold text-zinc-500 dark:text-zinc-400">{stat.label}</div>
-            </div>
-
-            {/* Sparkline Graphic */}
-            <div className="absolute bottom-0 left-0 right-0 h-1bg-zinc-100 dark:bg-white/5">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${60 + (i * 15)}%` }}
-                transition={{ duration: 1.5, delay: 0.5 + (i * 0.1), ease: "circOut" }}
-                className={`h-1 ${stat.bg.replace('/10', '')}`}
-              />
-            </div>
-          </motion.div>
+            </motion.div>
+          </Link>
         ))}
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6">
-        {/* User Profile Summary */}
-        <motion.section variants={itemVariants} className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">
-              Account Configuration
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* 3. LATEST INSIGHT BANNER */}
+        <motion.section variants={itemVariants} className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+              <Zap className="w-5 h-5 text-amber-500" /> Latest Discovery Signal
             </h2>
+            <Link href="/dashboard/research" className="text-xs font-bold text-blue-500 hover:underline">View Intelligence Hub</Link>
           </div>
-          <UserProfile />
+          <div className="relative p-8 rounded-[40px] bg-linear-to-br from-indigo-500 to-purple-600 text-white shadow-2xl overflow-hidden group min-h-[300px] flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 blur-[60px] rounded-full -translate-x-1/2 translate-y-1/2" />
+
+            <div className="relative z-10">
+              {loading ? (
+                <div className="flex gap-1 items-center h-20 animate-pulse bg-white/10 rounded-2xl px-4" />
+              ) : stats?.latestInsight ? (
+                <>
+                  <div className="flex items-center gap-2 text-white/70 text-[11px] font-bold tracking-widest uppercase mb-4">
+                    <Clock className="w-3 h-3" /> Latest Insight from {stats.latestInsight.title}
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-bold leading-tight mb-4">
+                    "{stats.latestInsight.summary?.split('.')[0]}..."
+                  </h3>
+                  <p className="text-white/80 line-clamp-3 text-sm leading-relaxed max-w-lg mb-6">
+                    {stats.latestInsight.summary?.substring(stats.latestInsight.summary.indexOf('.') + 1, 300).replace(/[#*`_]/g, '')}
+                  </p>
+                </>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center py-10 opacity-60">
+                  <MessageSquare className="w-12 h-12 mb-4" />
+                  <p className="font-bold">No intelligence processed yet.</p>
+                  <p className="text-sm opacity-80">Upload research to generate signals.</p>
+                </div>
+              )}
+            </div>
+
+            {stats?.latestInsight && (
+              <Link href={`/dashboard/research?focus=${stats.latestInsight.id}`} className="relative z-10 self-start px-6 py-2.5 bg-white/20 backdrop-blur-md rounded-full text-[12px] font-bold hover:bg-white/30 transition-all flex items-center gap-2 border border-white/20">
+                Deep Dive Insight <ChevronRight className="w-4 h-4" />
+              </Link>
+            )}
+          </div>
         </motion.section>
 
-        {/* Recent Activity Premium Timeline Placeholder */}
-        <motion.section variants={itemVariants} className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">
-              Pulse Activity
-            </h2>
-            <button className="text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center gap-1">
-              View All <ChevronRight className="w-4 h-4" />
-            </button>
+        {/* 4. QUICK ACTIONS & PROFILE */}
+        <motion.section variants={itemVariants} className="space-y-8">
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white px-2">Account</h2>
+            <UserProfile />
           </div>
-          <div className="rounded-[32px] bg-white dark:bg-[#0A0A0A] border border-zinc-200/50 shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)] overflow-hidden dark:border-white/5 h-full min-h-[460px] relative p-8">
-            {/* Grid Pattern Background */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[14px_24px] pointer-events-none" />
 
-            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
-              <motion.div
-                animate={{
-                  scale: [1, 1.05, 1],
-                  rotate: [0, 5, -5, 0]
-                }}
-                transition={{ duration: 6, repeat: Infinity, repeatType: "reverse" }}
-                className="w-20 h-20 bg-zinc-50 dark:bg-white/5 rounded-3xl flex items-center justify-center border border-zinc-200/50 dark:border-white/10 mb-6 shadow-xl backdrop-blur-sm"
-              >
-                <Activity className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
-              </motion.div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">Awaiting telemetry</h3>
-              <p className="text-[14px] font-medium text-zinc-500 dark:text-zinc-400 max-w-[280px] text-center leading-relaxed">
-                Your workspace activities, team updates, and automated insights will stream here in real-time.
-              </p>
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="mt-8 px-6 py-3 rounded-full bg-zinc-100 dark:bg-white/10 text-zinc-900 dark:text-white font-semibold text-sm hover:bg-zinc-200 dark:hover:bg-white/20 transition-colors"
-              >
-                Connect Data Sources
-              </motion.button>
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white px-2">Workflows</h2>
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { name: 'Canvas Workspace', icon: Layout, href: '/dashboard/canvas', color: 'text-blue-500' },
+                { name: 'Strategy Planner', icon: Lightbulb, href: '/dashboard/strategy', color: 'text-amber-500' },
+                { name: 'Research Repository', icon: Search, href: '/dashboard/research', color: 'text-emerald-500' }
+              ].map(tool => (
+                <Link key={tool.name} href={tool.href} className="group p-4 bg-white dark:bg-[#0A0A0A] border border-zinc-200/50 dark:border-white/5 rounded-2xl flex items-center justify-between hover:border-zinc-900 dark:hover:border-white transition-all shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <tool.icon className={`w-5 h-5 ${tool.color}`} />
+                    <span className="text-sm font-bold text-zinc-700 dark:text-zinc-300">{tool.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              ))}
             </div>
           </div>
         </motion.section>

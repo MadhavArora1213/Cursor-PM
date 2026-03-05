@@ -115,7 +115,7 @@ export async function ollamaGenerate(prompt: string, model: string = DEFAULT_MOD
                 options: {
                     temperature: 0.4,
                     top_p: 0.9,
-                    num_predict: 1000, // Explicitly allow larger generation
+                    num_predict: 1024, // Full strategy needs more tokens
                 },
             }));
 
@@ -173,114 +173,123 @@ Generate Universal Intelligence Report:`;
 }
 
 /**
- * Generate hypothesis from research data using Qwen.
+ * Generate a complete product strategy (hypothesis + user stories + OKRs) in ONE call.
+ * This ensures all parts of the strategy are grounded in the actual research data.
  */
-export async function generateHypothesesWithOllama(
-    topTheme: string,
+export interface FullStrategy {
+    hypothesis: { title: string; solution: string; benefit: string; need: string };
+    userStories: { text: string; rice: { r: number; i: number; c: number; e: number } }[];
+    okrs: { objective: string; keyResults: string[] }[];
+    risks: string[];
+    experiments: { title: string; hypothesis: string; metric: string }[];
+}
+
+/**
+ * Generate a complete product strategy (hypothesis + user stories + OKRs + Risks + Experiments) in ONE call.
+ * This ensures all parts of the strategy are grounded in the actual research data.
+ */
+export async function generateFullStrategyWithOllama(
+    themes: string[],
     researchSummaries: string[],
     analyzedCount: number
-): Promise<{ solution: string; benefit: string; need: string }> {
-    const context = researchSummaries.slice(0, 5).join('\n\n---\n\n');
-    const prompt = `You are a senior product strategist. Based on the research below, generate ONE strong product hypothesis.
+): Promise<FullStrategy> {
+    // Truncate each summary to keep total context manageable for 3B/7B model
+    const truncatedSummaries = researchSummaries.slice(0, 3).map(s => s.substring(0, 800));
+    const context = truncatedSummaries.join('\n---\n');
+    const themeList = themes.slice(0, 5).join(', ');
 
-Top User Pain Point: "${topTheme}"
-Research Summaries:
-"""
+    const prompt = `You are a Senior Product Manager. Analyze the user research and create a high-level product discovery strategy.
+
+THEMES DETECTED: ${themeList}
+
+RESEARCH CONTEXT:
 ${context}
-"""
 
-Respond ONLY with this JSON (no explanation, no markdown):
+Based on the research, generate a strategy in JSON format:
 {
-  "solution": "one concrete action to fix the problem (start with a verb)",
-  "benefit": "measurable user outcome",
-  "need": "${topTheme} appeared in ${analyzedCount} research items as a primary friction point"
-}`;
+  "hypothesis": {
+    "title": "short ambitious title",
+    "solution": "the primary feature/change to implement",
+    "benefit": "the primary outcome for the user",
+    "need": "the specific problem found in research this solves"
+  },
+  "userStories": [
+    {
+      "text": "As a [type], I want [action], so [value]",
+      "rice": { "r": 500, "i": 2, "c": 0.8, "e": 2 } 
+    }
+  ],
+  "okrs": [
+    {
+      "objective": "High level objective",
+      "keyResults": ["measurable metric 1", "measurable metric 2"]
+    }
+  ],
+  "risks": ["Risk 1 description", "Risk 2 description"],
+  "experiments": [
+    { "title": "Experiment Name", "hypothesis": "If we X then Y", "metric": "Conversion/Retention/etc" }
+  ]
+}
 
+RULES: 
+1. The Solution must directly solve a pain point in the research.
+2. RICE scores: Reach(count), Impact(1-3), Confidence(0-1), Effort(1-5).
+3. Output ONLY valid JSON.`;
+
+    console.log(`[STRATEGY] Requesting discovery strategy for: ${themeList}`);
     const raw = await ollamaGenerate(prompt);
+
     try {
         const jsonMatch = raw.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
+
             return {
-                solution: parsed.solution || `redesign the ${topTheme.toLowerCase()} flow`,
-                benefit: parsed.benefit || `user satisfaction increases by 30%`,
-                need: parsed.need || `${topTheme} was the top friction point`,
+                hypothesis: {
+                    title: parsed.hypothesis?.title || `Strategy for ${themeList}`,
+                    solution: parsed.hypothesis?.solution || 'No solution generated',
+                    benefit: parsed.hypothesis?.benefit || 'No benefit generated',
+                    need: parsed.hypothesis?.need || 'No need generated',
+                },
+                userStories: Array.isArray(parsed.userStories)
+                    ? parsed.userStories.map((s: any) => ({
+                        text: typeof s === 'string' ? s : (s.text || s.story || JSON.stringify(s)),
+                        rice: s.rice || { r: 100, i: 1, c: 0.5, e: 1 }
+                    }))
+                    : [],
+                okrs: Array.isArray(parsed.okrs)
+                    ? parsed.okrs.map((okr: any) => ({
+                        objective: String(okr.objective || ''),
+                        keyResults: Array.isArray(okr.keyResults) ? okr.keyResults.map(String) : [],
+                    }))
+                    : [],
+                risks: Array.isArray(parsed.risks) ? parsed.risks.map(String) : [],
+                experiments: Array.isArray(parsed.experiments)
+                    ? parsed.experiments.map((ex: any) => ({
+                        title: String(ex.title || 'Experiment'),
+                        hypothesis: String(ex.hypothesis || ''),
+                        metric: String(ex.metric || 'Success Rate')
+                    }))
+                    : []
             };
         }
-    } catch { /* fallback below */ }
+    } catch (e) {
+        console.warn('[STRATEGY] JSON Parse Failed. Falling back.', e);
+    }
+
+    // Comprehensive Fallback
     return {
-        solution: `redesign and simplify the ${topTheme.toLowerCase()} experience`,
-        benefit: `user satisfaction and task completion rate will increase by 30%`,
-        need: `${topTheme} appeared in ${analyzedCount} research items as a top concern`,
-    };
-}
-
-/**
- * Generate user stories using Qwen.
- */
-export async function generateUserStoriesWithOllama(
-    solution: string,
-    topTheme: string
-): Promise<string[]> {
-    const prompt = `You are a product manager writing user stories. Generate exactly 3 user stories (in "As a..., I want..., so that..." format) for this product improvement:
-
-Improvement: ${solution}
-Theme: ${topTheme}
-
-Respond with ONLY a JSON array of 3 strings:
-["As a new user...", "As a product manager...", "As a team member..."]`;
-
-    const raw = await ollamaGenerate(prompt);
-    try {
-        const jsonMatch = raw.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-    } catch { /* fallback below */ }
-    return [
-        `As a new user, I want a clear ${topTheme.toLowerCase()} walkthrough so I can complete my first task without confusion.`,
-        `As a product manager, I want to see real-time metrics on ${topTheme.toLowerCase()} so I can identify and resolve bottlenecks quickly.`,
-        `As a team member, I want streamlined ${topTheme.toLowerCase()} workflows so I can collaborate efficiently without friction.`,
-    ];
-}
-
-/**
- * Generate OKRs using Qwen.
- */
-export async function generateOKRsWithOllama(
-    objective: string,
-    topTheme: string
-): Promise<{ objective: string; keyResults: string[] }[]> {
-    const prompt = `You are an OKR coach. Generate 1 OKR for this product goal.
-
-Objective: ${objective}
-Theme: ${topTheme}
-
-Respond ONLY with this JSON:
-[{
-  "objective": "clear, inspiring objective statement",
-  "keyResults": [
-    "measurable KR 1 with specific metric",
-    "measurable KR 2 with specific metric",
-    "measurable KR 3 with specific metric"
-  ]
-}]`;
-
-    const raw = await ollamaGenerate(prompt);
-    try {
-        const jsonMatch = raw.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-    } catch { /* fallback below */ }
-    return [{
-        objective: `Resolve the top user pain point: ${topTheme}`,
-        keyResults: [
-            `Reduce user-reported issues related to ${topTheme.toLowerCase()} by 50% by Q2`,
-            `Increase NPS score from baseline by +15 points within 60 days of launch`,
-            `Achieve 80% task completion rate on redesigned flow in user testing`,
+        hypothesis: {
+            title: `Optimize ${themes[0] || 'Experience'}`,
+            solution: `Redesign the core ${themes[0] || 'product'} flow`,
+            benefit: `Drastic reduction in user friction`,
+            need: `Respond to ${themeList} identified in ${analyzedCount} research docs`
+        },
+        userStories: [
+            { text: `As a user, I want a faster ${themes[0]} so I can save time.`, rice: { r: 1000, i: 2, c: 0.8, e: 1 } }
         ],
-    }];
+        okrs: [{ objective: `Master ${themes[0] || 'Experience'}`, keyResults: [`Increase NPS by 10`] }],
+        risks: [`High implementation complexity`, `User resistance to change`],
+        experiments: [{ title: `Alpha Test`, hypothesis: `Low friction flow increases conversion`, metric: `Conversion Rate` }]
+    };
 }

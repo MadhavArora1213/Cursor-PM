@@ -6,7 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { checkOllamaHealth, summarizeWithOllama } from '@/lib/ollama';
+import { checkOllamaHealth, summarizeWithOllama, ollamaGenerate } from '@/lib/ollama';
 import { upsertResearchDocument, checkChromaHealth } from '@/lib/vectorService';
 
 const execAsync = promisify(exec);
@@ -29,21 +29,14 @@ async function extractTextFromFile(filePath: string, ext: string): Promise<strin
     const fileBuffer = await readFile(filePath);
 
     if (ext === '.pdf') {
-        // Mock DOMMatrix and DOMPoint to prevent pdf-parse/pdf.js from crashing in Node environments
-        if (typeof global !== 'undefined') {
-            if (typeof (global as any).DOMMatrix === 'undefined') {
-                (global as any).DOMMatrix = class DOMMatrix { };
-            }
-            if (typeof (global as any).DOMPoint === 'undefined') {
-                (global as any).DOMPoint = class DOMPoint { };
-            }
+        const pdf = require('pdf-parse');
+        try {
+            const data = await pdf(fileBuffer);
+            return data.text || '';
+        } catch (err) {
+            console.error('[PDF ERROR]', err);
+            return 'Error extracting PDF text.';
         }
-
-        const { PDFParse } = require('pdf-parse');
-        const parser = new PDFParse({ data: fileBuffer });
-        const data = await parser.getText();
-        await parser.destroy();
-        return data.text;
     }
 
     if (ext === '.txt' || ext === '.md') {
@@ -171,58 +164,36 @@ function analyzeSentiment(text: string): {
     };
 }
 
-async function extractThemes(text: string): Promise<string[]> {
-    const candidateLabels = [
-        'UI / UX Complexity', 'Performance & Speed', 'Onboarding & Learning Curve',
-        'Feature Requests', 'Pricing & Value', 'Collaboration & Teamwork',
-        'Data & Analytics', 'Integration & Compatibility', 'Reliability & Trust',
-        'Mobile Experience'
-    ];
-
-    // 1. Only attempt HuggingFace Inference if an explicit API key exists.
-    // Public unauthenticated calls to this route almost always timeout or hit rate limits instantly.
-    if (process.env.HF_API_KEY) {
+async function extractThemes(text: string, ollamaAvailable: boolean = false): Promise<string[]> {
+    // ── PRIMARY: Use Ollama/Qwen to extract REAL themes from the document ──
+    if (ollamaAvailable) {
         try {
-            const response = await fetch(
-                "https://router.huggingface.co/hf-inference/models/typeform/distilbert-base-uncased-mnli",
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${process.env.HF_API_KEY}`
-                    },
-                    method: "POST",
-                    body: JSON.stringify({
-                        inputs: text.substring(0, 1000), // Limit text to avoid payload size errors
-                        parameters: { candidate_labels: candidateLabels },
-                        options: { wait_for_model: true }
-                    }),
-                    signal: AbortSignal.timeout(15000), // Increased from 8s to 15s to allow HF models to wake up
-                }
-            );
+            const truncated = text.substring(0, 2000);
+            const prompt = `Read the following document and identify the 3-5 main themes or topics it covers. These themes should reflect what the document is ACTUALLY about — not generic categories.
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.labels && data.scores) {
-                    const themes: string[] = [];
-                    for (let i = 0; i < data.labels.length; i++) {
-                        if (data.scores[i] > 0.4) { // Confidence threshold
-                            themes.push(data.labels[i]);
-                        }
-                    }
-                    if (themes.length > 0) {
-                        console.log(`[HF API] Successfully extracted themes: ${themes.slice(0, 3)}`);
-                        return themes.slice(0, 5);
-                    }
+Document:
+"""
+${truncated}
+"""
+
+Respond ONLY with a JSON array of short theme strings. Example: ["Web Development", "Project Management", "API Design"]
+Do NOT add any explanation. Output ONLY the JSON array.`;
+
+            const raw = await ollamaGenerate(prompt);
+            const jsonMatch = raw.match(/\[[\s\S]*?\]/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    console.log(`[THEMES] Ollama extracted themes: ${parsed.slice(0, 5)}`);
+                    return parsed.slice(0, 5).map((t: any) => String(t));
                 }
             }
         } catch (e: any) {
-            console.warn("[HF API] Network error using key. Falling back to local NLP keywords.", e.message || 'Unknown error');
+            console.warn('[THEMES] Ollama theme extraction failed, falling back:', e.message);
         }
-    } else {
-        console.log(`[HF API] Skipping HuggingFace remote inference (No HF_API_KEY found). Using fast local NLP keywords.`);
     }
 
-    // FALLBACK: Fast Local NLP Keyword buckets
+    // ── FALLBACK: Keyword buckets (stricter — require 3+ keyword hits) ──
     const lowerText = text.toLowerCase();
     const themeBuckets: { theme: string; keywords: string[] }[] = [
         { theme: 'UI / UX Complexity', keywords: ['confusing', 'hard to find', 'complicated', 'cluttered', 'overwhelming', 'difficult', 'button', 'navigate', 'interface', 'design', 'layout', 'unclear'] },
@@ -237,13 +208,47 @@ async function extractThemes(text: string): Promise<string[]> {
         { theme: 'Mobile Experience', keywords: ['mobile', 'phone', 'tablet', 'responsive', 'app', 'ios', 'android', 'touch', 'small screen'] },
     ];
 
-    const found: string[] = [];
+    const found: { theme: string; hits: number }[] = [];
     for (const bucket of themeBuckets) {
-        const hit = bucket.keywords.some(kw => lowerText.includes(kw));
-        if (hit) found.push(bucket.theme);
+        // Count how many keywords actually match — require 3+ to avoid false positives
+        const hits = bucket.keywords.filter(kw => lowerText.includes(kw)).length;
+        if (hits >= 3) found.push({ theme: bucket.theme, hits });
     }
 
-    return found.slice(0, 5);
+    // Sort by number of keyword hits (most relevant first)
+    found.sort((a, b) => b.hits - a.hits);
+
+    // If no bucket hit 3+ keywords, extract simple TF-IDF-style top terms
+    if (found.length === 0) {
+        return extractTopTerms(text);
+    }
+
+    return found.slice(0, 5).map(f => f.theme);
+}
+
+// ── Simple top-term extraction when no keyword bucket matches ──
+function extractTopTerms(text: string): string[] {
+    const stopWords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may',
+        'might', 'shall', 'can', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
+        'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between',
+        'and', 'but', 'or', 'nor', 'not', 'so', 'yet', 'both', 'either', 'neither',
+        'this', 'that', 'these', 'those', 'it', 'its', 'i', 'me', 'my', 'we', 'our', 'you',
+        'your', 'he', 'she', 'they', 'them', 'their', 'his', 'her', 'who', 'which', 'what',
+        'all', 'each', 'every', 'any', 'some', 'no', 'other', 'such', 'than', 'too', 'very',
+        'also', 'just', 'about', 'up', 'out', 'if', 'then', 'more', 'over', 'only', 'new',
+        'used', 'using', 'use', 'work', 'based', 'including', 'well', 'like', 'etc']);
+
+    const words = text.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
+    const freq: Record<string, number> = {};
+    for (const w of words) freq[w] = (freq[w] || 0) + 1;
+
+    const topWords = Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([word]) => word.charAt(0).toUpperCase() + word.slice(1));
+
+    return topWords;
 }
 
 // ─────────────────────────────────────────────────────
@@ -273,9 +278,42 @@ function extractiveSummarize(text: string): string {
 }
 
 // ─────────────────────────────────────────────────────
-// TOOL 6: Quote Extractor
+// TOOL 6: Quote Extractor (Ollama-powered + fallback)
 // ─────────────────────────────────────────────────────
-function extractQuotes(text: string): { text: string; sentiment: string }[] {
+async function extractQuotes(text: string, ollamaAvailable: boolean = false): Promise<{ text: string; sentiment: string }[]> {
+    // ── PRIMARY: Use Ollama to extract meaningful quotes ──
+    if (ollamaAvailable) {
+        try {
+            const truncated = text.substring(0, 2000);
+            const prompt = `Read this document and extract the 3-4 most important, meaningful, or impactful sentences/passages directly from the text. These should be exact or near-exact quotes from the document.
+
+Document:
+"""
+${truncated}
+"""
+
+Respond ONLY with a JSON array of objects. Each object has "text" (the quote) and "sentiment" ("positive", "negative", or "neutral").
+Example: [{"text": "We achieved 40% growth in Q3", "sentiment": "positive"}]
+Output ONLY the JSON array, no explanation.`;
+
+            const raw = await ollamaGenerate(prompt);
+            const jsonMatch = raw.match(/\[[\s\S]*?\]/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    console.log(`[QUOTES] Ollama extracted ${parsed.length} quotes`);
+                    return parsed.slice(0, 4).map((q: any) => ({
+                        text: String(q.text || ''),
+                        sentiment: ['positive', 'negative', 'neutral'].includes(q.sentiment) ? q.sentiment : 'neutral',
+                    }));
+                }
+            }
+        } catch (e: any) {
+            console.warn('[QUOTES] Ollama quote extraction failed, falling back:', e.message);
+        }
+    }
+
+    // ── FALLBACK: Sentiment-scored sentence extraction ──
     const Sentiment = require('sentiment');
     const analyzer = new Sentiment();
 
@@ -369,32 +407,29 @@ export async function POST(req: Request) {
         console.log(`[ANALYZE] Running sentiment analysis...`);
         const sentiment = analyzeSentiment(rawText);
 
-        // ── STEP 3: THEMES (TOOL 4 – HF-style classifier) ───
-        console.log(`[ANALYZE] Extracting themes...`);
-        const themes = await extractThemes(rawText);
+        // ── STEP 3-5: THEMES + SUMMARY + QUOTES (run in parallel) ───
+        console.log(`[ANALYZE] Extracting themes, summary & quotes${ollamaStatus.available ? ' (Ollama-powered)' : ''}...`);
 
-        // ── STEP 4: SUMMARIZATION (TOOL 5 – Ollama/Qwen) ────
-        let summary: string;
+        const themesPromise = extractThemes(rawText, ollamaStatus.available);
+        const quotesPromise = extractQuotes(rawText, ollamaStatus.available);
+
+        let summaryPromise: Promise<string>;
         let summarySource: 'ollama' | 'extractive' = 'extractive';
 
         if (ollamaStatus.available) {
-            try {
-                console.log(`[ANALYZE] Generating summary with Ollama (${ollamaStatus.model})...`);
-                summary = await summarizeWithOllama(rawText);
-                summarySource = 'ollama';
-                console.log(`[ANALYZE] ✅ Ollama summary complete`);
-            } catch (ollamaErr) {
-                console.warn('[ANALYZE] Ollama failed, falling back to extractive:', ollamaErr);
-                summary = extractiveSummarize(rawText);
-            }
+            summaryPromise = summarizeWithOllama(rawText)
+                .then(s => { summarySource = 'ollama'; return s; })
+                .catch(err => {
+                    console.warn('[ANALYZE] Ollama summary failed, falling back:', err);
+                    return extractiveSummarize(rawText);
+                });
         } else {
             console.log(`[ANALYZE] Ollama offline, using extractive summarizer`);
-            summary = extractiveSummarize(rawText);
+            summaryPromise = Promise.resolve(extractiveSummarize(rawText));
         }
 
-        // ── STEP 5: KEY QUOTES ───────────────────────────────
-        console.log(`[ANALYZE] Extracting key quotes...`);
-        const quotes = extractQuotes(rawText);
+        const [themes, summary, quotes] = await Promise.all([themesPromise, summaryPromise, quotesPromise]);
+        console.log(`[ANALYZE] ✅ Themes: ${themes.join(', ')} | Summary source: ${summarySource} | Quotes: ${quotes.length}`);
 
         // ── STEP 6: CHROMADB EMBEDDING (TOOL 6) ─────────────
         let vectorized = false;

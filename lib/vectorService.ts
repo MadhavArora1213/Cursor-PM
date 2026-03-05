@@ -15,10 +15,19 @@ let collection: Collection | null = null;
 
 /**
  * Check if ChromaDB is running.
+ * Tries v2 API first (ChromaDB >= 1.0), then falls back to v1.
  */
 export async function checkChromaHealth(): Promise<boolean> {
     try {
-        // Ping the root or heartbeat, ignoring 410 Unimplemented as it still means the server is accessible
+        // Try v2 first (ChromaDB >= 1.0 / 1.5+)
+        const res = await fetch(`${CHROMA_URL}/api/v2/heartbeat`, {
+            signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok || res.status === 410 || res.status === 404) return true;
+    } catch { /* v2 not available */ }
+
+    try {
+        // Fallback to v1 (older ChromaDB versions)
         const res = await fetch(`${CHROMA_URL}/api/v1/heartbeat`, {
             signal: AbortSignal.timeout(3000),
         });
@@ -49,14 +58,14 @@ const ollamaEmbeddingFunction = {
                 if (!res.ok) {
                     console.warn(`[EMBEDDING ERROR] Failed to generate embedding with Ollama status: ${res.status}`);
                     // Fallback to a zero-vector so indexing doesn't completely crash the whole process
-                    embeddings.push(Array(3584).fill(0.01));
+                    embeddings.push(Array(2048).fill(0.01));
                     continue;
                 }
                 const data = await res.json();
                 embeddings.push(data.embedding);
             } catch (err) {
                 console.warn(`[EMBEDDING ERROR] Network error hitting Ollama:`, err);
-                embeddings.push(Array(3584).fill(0.01)); // Fallback dimensionality
+                embeddings.push(Array(2048).fill(0.01)); // Fallback dimensionality
             }
         }
         return embeddings;
@@ -130,7 +139,7 @@ export async function upsertResearchDocument(
         ids: [id],
         documents: [documentText], // Cap at 8k chars
         embeddings: embeddings,
-        metadatas: [{ ...metadata, indexedAt: new Date().toISOString() }],
+        metadatas: [{ ...metadata, id, indexedAt: new Date().toISOString() }],
     });
 }
 
@@ -164,13 +173,26 @@ export interface SemanticSearchResult {
 export async function semanticSearch(
     query: string,
     workspaceId?: string,
-    nResults: number = 5
+    nResults: number = 5,
+    idList?: string[]
 ): Promise<SemanticSearchResult[]> {
     const col = await getCollection();
 
-    const whereClause = workspaceId
-        ? { workspaceId: { $eq: workspaceId } }
-        : undefined;
+    let whereClause: any = undefined;
+
+    if (workspaceId && idList && idList.length > 0) {
+        // Correct ChromaDB $in syntax for metadata filtering
+        whereClause = {
+            $and: [
+                { workspaceId: { $eq: workspaceId } },
+                { id: { $in: idList } }
+            ]
+        };
+    } else if (workspaceId) {
+        whereClause = { workspaceId: { $eq: workspaceId } };
+    } else if (idList && idList.length > 0) {
+        whereClause = { id: { $in: idList } };
+    }
 
     const queryEmbeddings = await ollamaEmbeddingFunction.generate([query]);
 

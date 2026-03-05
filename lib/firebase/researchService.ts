@@ -28,6 +28,33 @@ export const getResearchByWorkspace = async (workspaceId: string): Promise<Resea
     return results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
+export const getResearchItemsByIds = async (ids: string[]): Promise<ResearchItem[]> => {
+    if (!ids || ids.length === 0) return [];
+
+    // Firestore 'in' queries are limited to 10 elements per query
+    const results: ResearchItem[] = [];
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 10) {
+        chunks.push(ids.slice(i, i + 10));
+    }
+
+    const researchRef = collection(db, 'research');
+    for (const chunk of chunks) {
+        const q = query(researchRef, where('__name__', 'in', chunk));
+        const snapshot = await getDocs(q);
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            results.push({
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt?.toDate() || new Date(),
+                updatedAt: data.updatedAt?.toDate() || new Date(),
+            } as ResearchItem);
+        });
+    }
+    return results;
+};
+
 export const deleteResearchItem = async (itemId: string, fileUrl?: string) => {
     const itemRef = doc(db, 'research', itemId);
     await deleteDoc(itemRef);
