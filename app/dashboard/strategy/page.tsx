@@ -562,13 +562,13 @@ export default function StrategyPlannerPage() {
                     ) : (
                         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             {[
-                                { label: 'Q1', items: roadmap.q1, color: 'emerald', icon: Rocket },
-                                { label: 'Q2', items: roadmap.q2, color: 'blue', icon: TrendingUp },
-                                { label: 'Q3', items: roadmap.q3, color: 'purple', icon: Users },
-                                { label: 'Q4', items: roadmap.q4, color: 'orange', icon: Target },
+                                { key: 'q1', label: 'Q1', color: 'emerald', icon: Rocket },
+                                { key: 'q2', label: 'Q2', color: 'blue', icon: TrendingUp },
+                                { key: 'q3', label: 'Q3', color: 'purple', icon: Users },
+                                { key: 'q4', label: 'Q4', color: 'orange', icon: Target },
                             ].map(q => (
-                                <motion.div key={q.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                                    className={`bg-white dark:bg-[#0A0A0A] border border-zinc-200/80 dark:border-white/10 rounded-[20px] p-5 shadow-sm relative overflow-hidden`}>
+                                <motion.div key={q.key} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                    className={`bg-white dark:bg-[#0A0A0A] border border-zinc-200/80 dark:border-white/10 rounded-[20px] p-5 shadow-sm relative overflow-hidden min-h-[300px]`}>
                                     <div className={`absolute top-0 right-0 w-20 h-20 bg-${q.color}-500/10 blur-[30px] rounded-full`} />
                                     <div className="flex items-center gap-2 mb-4">
                                         <div className={`w-8 h-8 rounded-lg bg-${q.color}-100 dark:bg-${q.color}-500/10 flex items-center justify-center`}>
@@ -576,17 +576,23 @@ export default function StrategyPlannerPage() {
                                         </div>
                                         <h3 className="font-bold text-zinc-900 dark:text-white text-sm">{q.label}</h3>
                                     </div>
-                                    <div className="space-y-2">
-                                        {q.items.length === 0 ? (
-                                            <p className="text-[12px] text-zinc-400 italic">No items planned</p>
+                                    <ReactSortable
+                                        list={(roadmap as any)[q.key].map((text: string, id: number) => ({ id: `${q.key}-${id}`, text }))}
+                                        setList={(newList) => setRoadmap(prev => ({ ...prev, [q.key]: newList.map(item => item.text) }))}
+                                        group="roadmap-shared"
+                                        animation={200}
+                                        className="space-y-2 min-h-[200px]"
+                                    >
+                                        {(roadmap as any)[q.key].length === 0 ? (
+                                            <p className="text-[12px] text-zinc-400 italic pointer-events-none py-4 text-center">Drop items here</p>
                                         ) : (
-                                            q.items.map((item, i) => (
-                                                <div key={i} className="p-2.5 rounded-lg bg-zinc-50 dark:bg-white/[0.02] border border-zinc-200/50 dark:border-white/5 text-[12px] text-zinc-700 dark:text-zinc-300 font-medium">
+                                            (roadmap as any)[q.key].map((item: string, i: number) => (
+                                                <div key={i} className="p-2.5 rounded-lg bg-zinc-50 dark:bg-white/[0.02] border border-zinc-200/50 dark:border-white/5 text-[12px] text-zinc-700 dark:text-zinc-300 font-medium cursor-grab active:cursor-grabbing hover:border-blue-400/50 transition-colors">
                                                     {item}
                                                 </div>
                                             ))
                                         )}
-                                    </div>
+                                    </ReactSortable>
                                 </motion.div>
                             ))}
                         </div>

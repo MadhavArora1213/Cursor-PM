@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { signOut } from "@/lib/firebase/auth";
-import { LogOut, LayoutDashboard, Search, Users, Settings, ChevronRight, Sparkles, Lightbulb, Layout } from "lucide-react";
+import { LogOut, LayoutDashboard, Search, Users, Settings, ChevronRight, Sparkles, Lightbulb, Layout, FlaskConical, MessageSquare, Brain } from "lucide-react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -38,8 +38,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     const navItems = [
         { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Knowledge Hub', href: '/dashboard/knowledge', icon: Brain },
+        { name: 'Collaboration Space', href: '/dashboard/collaboration', icon: MessageSquare },
         { name: 'Research Intelligence', href: '/dashboard/research', icon: Search },
         { name: 'Strategy Planner', href: '/dashboard/strategy', icon: Lightbulb },
+        { name: 'Validation Center', href: '/dashboard/validation', icon: FlaskConical },
         { name: 'Canvas Workspace', href: '/dashboard/canvas', icon: Layout },
         { name: 'Workspace & Team', href: '/dashboard/workspace', icon: Users },
         { name: 'Profile Settings', href: '/dashboard/profile', icon: Settings },

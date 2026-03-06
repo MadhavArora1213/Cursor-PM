@@ -8,7 +8,7 @@
 import { ChromaClient, Collection } from 'chromadb';
 
 const CHROMA_URL = process.env.CHROMA_URL || 'http://localhost:8000';
-const COLLECTION_NAME = 'research_documents';
+const COLLECTION_NAME = 'workspace_knowledge';
 
 let client: ChromaClient | null = null;
 let collection: Collection | null = null;

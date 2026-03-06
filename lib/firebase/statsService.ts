@@ -1,21 +1,20 @@
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { db } from './config';
+import { DBAdapter } from '../db-adapter';
 import { ResearchItem } from '@/types/research';
 
 export const getDashboardStats = async (workspaceId: string) => {
     try {
-        const researchRef = collection(db, 'research');
-        const q = query(researchRef, where('workspaceId', '==', workspaceId));
-        const snapshot = await getDocs(q);
+        const items = await DBAdapter.getAll('research', { workspaceId });
 
-        const total = snapshot.docs.length;
-        const analyzed = snapshot.docs.filter(d => d.data().status === 'analyzed').length;
-        const positive = snapshot.docs.filter(d => d.data().sentiment === 'positive').length;
+        const total = items.length;
+        const analyzed = items.filter(d => d.status === 'analyzed').length;
+        const positive = items.filter(d => d.sentiment === 'positive').length;
 
         // Get latest insight
-        const latestQuery = query(researchRef, where('workspaceId', '==', workspaceId), where('status', '==', 'analyzed'), orderBy('updatedAt', 'desc'), limit(1));
-        const latestSnap = await getDocs(latestQuery);
-        const latestItem = latestSnap.docs.length > 0 ? latestSnap.docs[0].data() as ResearchItem : null;
+        const analyzedItems = items
+            .filter(d => d.status === 'analyzed')
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+        const latestItem = analyzedItems.length > 0 ? analyzedItems[0] as ResearchItem : null;
 
         return {
             totalResearch: total,
@@ -24,7 +23,7 @@ export const getDashboardStats = async (workspaceId: string) => {
             latestInsight: latestItem ? {
                 title: latestItem.title,
                 summary: latestItem.summary,
-                id: latestSnap.docs[0].id
+                id: latestItem.id
             } : null
         };
     } catch (error) {

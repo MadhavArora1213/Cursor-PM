@@ -4,8 +4,7 @@ import { join, extname } from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { LocalDB } from '@/lib/localDB';
 import { checkOllamaHealth, summarizeWithOllama, ollamaGenerate } from '@/lib/ollama';
 import { upsertResearchDocument, checkChromaHealth } from '@/lib/vectorService';
 
@@ -363,10 +362,8 @@ export async function POST(req: Request) {
         }
 
         const ext = extname(absolutePath).toLowerCase();
-        const itemRef = doc(db, 'research', itemId);
-
-        // Mark as processing in Firestore
-        await updateDoc(itemRef, { status: 'processing', updatedAt: new Date() });
+        // Mark as processing in LocalDB
+        await LocalDB.update('research', itemId, { status: 'processing', updatedAt: new Date().toISOString() });
 
         // ── CHECK AI SERVICE AVAILABILITY ────────────────────
         const [ollamaStatus, chromaAvailable] = await Promise.all([
@@ -395,10 +392,10 @@ export async function POST(req: Request) {
         }
 
         if (!rawText || rawText.length < 10) {
-            await updateDoc(itemRef, {
+            await LocalDB.update('research', itemId, {
                 status: 'failed',
                 summary: 'Could not extract text content from this file.',
-                updatedAt: new Date(),
+                updatedAt: new Date().toISOString(),
             });
             return NextResponse.json({ error: 'No text content could be extracted' }, { status: 422 });
         }
@@ -456,8 +453,8 @@ export async function POST(req: Request) {
         // Word count stats
         const wordCount = rawText.split(/\s+/).filter(w => w.length > 0).length;
 
-        // ── SAVE RESULTS TO FIRESTORE ────────────────────────
-        await updateDoc(itemRef, {
+        // ── SAVE RESULTS TO LocalDB ────────────────────────
+        await LocalDB.update('research', itemId, {
             status: 'analyzed',
             content: rawText.substring(0, 5000),
             summary,
@@ -478,7 +475,7 @@ export async function POST(req: Request) {
                 ollamaModel: ollamaStatus.available ? ollamaStatus.model : null,
                 chromaIndexed: vectorized,
             },
-            updatedAt: new Date(),
+            updatedAt: new Date().toISOString(),
         });
 
         console.log(`[ANALYZE] ✅ Analysis complete for item: ${itemId}`);

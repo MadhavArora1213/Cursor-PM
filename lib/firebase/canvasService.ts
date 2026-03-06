@@ -1,5 +1,4 @@
-import { collection, doc, setDoc, getDoc, updateDoc, query, where, getDocs, deleteDoc } from 'firebase/firestore';
-import { db } from './config';
+import { DBAdapter } from '../db-adapter';
 
 export interface CanvasCard {
     id: string;
@@ -20,20 +19,29 @@ export interface CanvasBoard {
     updatedAt: any;
 }
 
+const COLLECTION = 'canvas_boards';
+
 export const saveCanvasBoard = async (workspaceId: string, cards: CanvasCard[]) => {
-    const boardRef = doc(db, 'canvas_boards', workspaceId);
-    await setDoc(boardRef, {
-        workspaceId,
-        cards,
-        updatedAt: new Date()
-    }, { merge: true });
+    // Check if board already exists to update or create
+    const boards = await DBAdapter.getAll(COLLECTION, { workspaceId });
+    if (boards.length > 0) {
+        await DBAdapter.update(COLLECTION, boards[0].id, {
+            cards,
+            updatedAt: new Date().toISOString()
+        });
+    } else {
+        await DBAdapter.add(COLLECTION, {
+            workspaceId,
+            cards,
+            updatedAt: new Date().toISOString()
+        });
+    }
 };
 
 export const getCanvasBoard = async (workspaceId: string): Promise<CanvasCard[] | null> => {
-    const boardRef = doc(db, 'canvas_boards', workspaceId);
-    const snap = await getDoc(boardRef);
-    if (snap.exists()) {
-        return snap.data().cards as CanvasCard[];
+    const boards = await DBAdapter.getAll(COLLECTION, { workspaceId });
+    if (boards.length > 0) {
+        return boards[0].cards as CanvasCard[];
     }
     return null;
 };

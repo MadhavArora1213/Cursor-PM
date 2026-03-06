@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onIdTokenChanged } from 'firebase/auth';
 import { setCookie, destroyCookie } from 'nookies';
 import { auth } from '@/lib/firebase/config';
+import { getUserProfile, createUserProfile } from '@/lib/firebase/userService';
 
 interface AuthContextType {
     user: User | null;
@@ -36,6 +37,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } else {
                 setUser(usr);
                 setIsAuthModalOpen(false); // Close modal on successful login
+
+                // --- LOCAL PROFILE SYNC ---
+                try {
+                    const localProfile = await getUserProfile(usr.uid);
+                    if (!localProfile) {
+                        await createUserProfile({
+                            id: usr.uid,
+                            email: usr.email || '',
+                            name: usr.displayName || 'Anonymous User',
+                            avatar: usr.photoURL || '',
+                            role: 'pm'
+                        });
+                        console.log("Local profile created for:", usr.uid);
+                    }
+                } catch (err) {
+                    console.error("Error syncing local profile:", err);
+                }
+                // --------------------------
+
                 const token = await usr.getIdToken();
                 setCookie(null, 'token', token, {
                     maxAge: 30 * 24 * 60 * 60, // 30 days

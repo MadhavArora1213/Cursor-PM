@@ -1,4 +1,4 @@
-import { auth, db } from './config';
+import { auth } from './config';
 import {
     signInWithPopup,
     GoogleAuthProvider,
@@ -9,22 +9,29 @@ import {
     signOut as firebaseSignOut,
     User
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { LocalDBService } from '../localDBService';
 
-const saveUserToFirestore = async (user: User) => {
+const saveUserToLocalDB = async (user: User) => {
     if (!user) return;
     try {
-        const userRef = doc(db, 'users', user.uid);
-        await setDoc(userRef, {
+        const userData = {
+            id: user.uid,
             uid: user.uid,
             email: user.email,
-            displayName: user.displayName || '',
-            photoURL: user.photoURL || '',
-            lastLogin: serverTimestamp(),
-            // When signing up via provider, this saves info. When signing in, it merges & updates lastLogin.
-        }, { merge: true });
+            name: user.displayName || '',
+            avatar: user.photoURL || '',
+            lastLogin: new Date().toISOString(),
+        };
+
+        // Check if user exists
+        const existing = await LocalDBService.getById('users', user.uid);
+        if (existing) {
+            await LocalDBService.update('users', user.uid, userData);
+        } else {
+            await LocalDBService.add('users', userData);
+        }
     } catch (error) {
-        console.error("Error saving user to firestore:", error);
+        console.error("Error saving user to LocalDB:", error);
     }
 };
 
@@ -32,7 +39,7 @@ export const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
         const result = await signInWithPopup(auth, provider);
-        if (result.user) await saveUserToFirestore(result.user);
+        if (result.user) await saveUserToLocalDB(result.user);
         return result.user;
     } catch (error: any) {
         if (error.message.includes('dummy-')) {
@@ -47,7 +54,7 @@ export const signInWithGitHub = async () => {
     const provider = new GithubAuthProvider();
     try {
         const result = await signInWithPopup(auth, provider);
-        if (result.user) await saveUserToFirestore(result.user);
+        if (result.user) await saveUserToLocalDB(result.user);
         return result.user;
     } catch (error: any) {
         if (error.message.includes('dummy-')) {
@@ -70,7 +77,7 @@ export const signOut = async () => {
 export const signInWithEmail = async (email: string, pass: string) => {
     try {
         const result = await signInWithEmailAndPassword(auth, email, pass);
-        if (result.user) await saveUserToFirestore(result.user);
+        if (result.user) await saveUserToLocalDB(result.user);
         return result.user;
     } catch (error: any) {
         console.error("Error signing in with Email", error);
@@ -81,7 +88,7 @@ export const signInWithEmail = async (email: string, pass: string) => {
 export const signUpWithEmail = async (email: string, pass: string) => {
     try {
         const result = await createUserWithEmailAndPassword(auth, email, pass);
-        if (result.user) await saveUserToFirestore(result.user);
+        if (result.user) await saveUserToLocalDB(result.user);
         return result.user;
     } catch (error: any) {
         console.error("Error signing up with Email", error);
@@ -97,4 +104,3 @@ export const resetPassword = async (email: string) => {
         throw error;
     }
 };
-
