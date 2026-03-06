@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { signOut } from "@/lib/firebase/auth";
-import { LogOut, LayoutDashboard, Search, Users, Settings, ChevronRight, Sparkles, Lightbulb, Layout, FlaskConical, MessageSquare, Brain, Terminal } from "lucide-react";
+import { LogOut, LayoutDashboard, Search, Users, Settings, ChevronRight, Sparkles, Lightbulb, Layout, FlaskConical, MessageSquare, Brain, Terminal, MessageCircle, Map as MapIcon } from "lucide-react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,6 +42,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: 'Knowledge Hub', href: '/dashboard/knowledge', icon: Brain },
         { name: 'Engineering Hub', href: '/dashboard/engineering', icon: Terminal },
         { name: 'Collaboration Space', href: '/dashboard/collaboration', icon: MessageSquare },
+        { name: 'Feedback Triage', href: '/dashboard/feedback', icon: MessageCircle },
+        { name: 'Public Roadmap', href: '/dashboard/roadmap', icon: MapIcon },
         { name: 'Research Intelligence', href: '/dashboard/research', icon: Search },
         { name: 'Strategy Planner', href: '/dashboard/strategy', icon: Lightbulb },
         { name: 'Validation Center', href: '/dashboard/validation', icon: FlaskConical },
