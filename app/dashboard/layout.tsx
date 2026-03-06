@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { signOut } from "@/lib/firebase/auth";
-import { LogOut, LayoutDashboard, Search, Users, Settings, ChevronRight, Sparkles, Lightbulb, Layout, FlaskConical, MessageSquare, Brain } from "lucide-react";
+import { LogOut, LayoutDashboard, Search, Users, Settings, ChevronRight, Sparkles, Lightbulb, Layout, FlaskConical, MessageSquare, Brain, Terminal } from "lucide-react";
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
@@ -39,6 +40,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const navItems = [
         { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Knowledge Hub', href: '/dashboard/knowledge', icon: Brain },
+        { name: 'Engineering Hub', href: '/dashboard/engineering', icon: Terminal },
         { name: 'Collaboration Space', href: '/dashboard/collaboration', icon: MessageSquare },
         { name: 'Research Intelligence', href: '/dashboard/research', icon: Search },
         { name: 'Strategy Planner', href: '/dashboard/strategy', icon: Lightbulb },
@@ -150,6 +152,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Main Content Area */}
             <main className="flex-1 md:ml-[280px] p-4 sm:p-6 md:p-12 max-w-[1600px] mx-auto w-full transition-all relative z-10 overflow-x-hidden">
+                {/* Global Dashboard Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="hidden md:flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500 mb-1">Cursor-PM Workspace</span>
+                        <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter">
+                            {pathname.split('/').pop()?.replace(/-/g, ' ').toUpperCase() || 'DASHBOARD'}
+                        </h2>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <NotificationBell />
+                        <div className="h-4 w-[1px] bg-zinc-200 dark:bg-white/10" />
+                        <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setShowSignOutConfirm(true)}>
+                            <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center p-2 group-hover:bg-red-500/10 transition-all">
+                                <LogOut className="w-4 h-4 text-zinc-400 group-hover:text-red-500 transition-colors" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={pathname}

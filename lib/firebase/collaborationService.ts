@@ -1,6 +1,7 @@
 import { ref, push, set, onValue, query, orderByChild, equalTo, remove, update, off, get } from 'firebase/database';
 import { realtimeDB } from './config';
 import { Comment, WorkshopSession, AppNotification } from '@/types/collaboration';
+import { notifyWorkspaceMembers } from '../notificationService';
 
 // --- COMMENTS (RTDB) ---
 export const subscribeToComments = (itemType: string, itemId: string, callback: (comments: Comment[]) => void) => {
@@ -26,6 +27,7 @@ export const subscribeToComments = (itemType: string, itemId: string, callback: 
     return () => off(q, 'value', listener);
 };
 
+
 export const addComment = async (comment: Omit<Comment, 'id' | 'createdAt' | 'updatedAt'>) => {
     const commentsRef = ref(realtimeDB, 'comments');
     const newCommentRef = push(commentsRef);
@@ -39,6 +41,16 @@ export const addComment = async (comment: Omit<Comment, 'id' | 'createdAt' | 'up
     };
 
     await set(newCommentRef, newComment);
+
+    // Notify others in workspace
+    await notifyWorkspaceMembers(
+        comment.workspaceId,
+        comment.authorId,
+        'New Comment',
+        `${comment.authorName} left a comment on a ${comment.itemType}.`,
+        '/dashboard/collaboration'
+    );
+
     return newCommentRef.key;
 };
 

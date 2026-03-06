@@ -8,7 +8,7 @@ import {
     Lightbulb, Target, ChevronDown, Loader2,
     ShieldAlert, Sparkles, FileText, ArrowRight, BarChart2, Cpu, Zap, GripVertical,
     FlaskConical, Shield, Map, Calculator, Download, Copy, Check, AlertTriangle,
-    Rocket, Clock, Users, TrendingUp
+    Rocket, Clock, Users, TrendingUp, Database
 } from "lucide-react";
 import { getResearchByWorkspace } from "@/lib/firebase/researchService";
 import { ResearchItem } from "@/types/research";
@@ -82,6 +82,71 @@ export default function StrategyPlannerPage() {
     const [prdCopied, setPrdCopied] = useState(false);
     const [roadmap, setRoadmap] = useState<{ q1: string[]; q2: string[]; q3: string[]; q4: string[] }>({ q1: [], q2: [], q3: [], q4: [] });
     const [activeTab, setActiveTab] = useState<'strategy' | 'prioritize' | 'roadmap' | 'experiments' | 'prd'>('strategy');
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<string | null>(null);
+
+    const handleSaveToDB = async (currentStrategy: Strategy, currentRice: RICEFeature[]) => {
+        if (!activeWorkspace) return;
+        setIsSaving(true);
+        try {
+            // 1. Save main strategy document
+            await fetch('/api/localdb', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    collection: 'strategies',
+                    action: 'add',
+                    data: { ...currentStrategy, workspaceId: activeWorkspace.id, updatedAt: new Date().toISOString() }
+                }),
+            });
+
+            // 2. Save features for separate indexing
+            for (const feat of currentRice) {
+                await fetch('/api/localdb', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        collection: 'features',
+                        action: 'add',
+                        data: {
+                            workspaceId: activeWorkspace.id,
+                            title: feat.name,
+                            impact: feat.impact >= 3 ? 'high' : 'medium',
+                            reach: feat.reach,
+                            confidence: feat.confidence,
+                            effort: feat.effort,
+                            updatedAt: new Date().toISOString()
+                        }
+                    }),
+                });
+            }
+
+            // 3. Save OKRs
+            for (const okr of currentStrategy.okrs || []) {
+                await fetch('/api/localdb', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        collection: 'okrs',
+                        action: 'add',
+                        data: {
+                            workspaceId: activeWorkspace.id,
+                            objective: okr.objective,
+                            keyResults: okr.keyResults,
+                            status: 'active',
+                            updatedAt: new Date().toISOString()
+                        }
+                    }),
+                });
+            }
+
+            setLastSaved(new Date().toLocaleTimeString());
+        } catch (err) {
+            console.error('Persistence failed:', err);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     // ── Strategy Generator ──
     const callGenerateAPI = async (items: ResearchItem[]): Promise<Strategy | null> => {
@@ -195,7 +260,14 @@ export default function StrategyPlannerPage() {
 
     const handleGenerate = async () => {
         setGenerating(true); setGenerateError('');
-        try { const gen = await callGenerateAPI(researchItems); setStrategy(gen); }
+        try {
+            const gen = await callGenerateAPI(researchItems);
+            if (gen) {
+                setStrategy(gen);
+                // Auto-save the new strategy
+                await handleSaveToDB(gen, riceFeatures);
+            }
+        }
         catch (err: any) { setGenerateError(err.message || 'Failed'); }
         finally { setGenerating(false); }
     };
@@ -292,10 +364,17 @@ export default function StrategyPlannerPage() {
                         {generating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Strategy</>}
                     </button>
                     {strategy && (
-                        <button onClick={handleGeneratePRD} disabled={prdLoading}
-                            className="shrink-0 flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold text-[12px] rounded-xl shadow-lg hover:opacity-90 transition-opacity disabled:opacity-40">
-                            {prdLoading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Building PRD...</> : <><FileText className="w-3.5 h-3.5" /> Generate PRD</>}
-                        </button>
+                        <>
+                            <button onClick={() => handleSaveToDB(strategy, riceFeatures)} disabled={isSaving}
+                                className="shrink-0 flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-[12px] rounded-xl hover:bg-emerald-500/20 transition-all disabled:opacity-40">
+                                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+                                {isSaving ? 'Saving...' : lastSaved ? `Synced ${lastSaved}` : 'Sync Workspace'}
+                            </button>
+                            <button onClick={handleGeneratePRD} disabled={prdLoading}
+                                className="shrink-0 flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-bold text-[12px] rounded-xl shadow-lg hover:opacity-90 transition-opacity disabled:opacity-40">
+                                {prdLoading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Building PRD...</> : <><FileText className="w-3.5 h-3.5" /> Generate PRD</>}
+                            </button>
+                        </>
                     )}
                 </div>
             </motion.div>
