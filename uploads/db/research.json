@@ -1,0 +1,38 @@
+[
+  {
+    "workspaceId": "5aahvlsmd9c",
+    "uploaderId": "ld4XGPmTyOaLH2gGlrQ1wMPBoZH2",
+    "title": "DOC-20251210-WA0023..pdf",
+    "description": "Uploaded via Research API",
+    "type": "document",
+    "status": "analyzed",
+    "fileUrl": "/api/files/5aahvlsmd9c/1773241601679_DOC-20251210-WA0023..pdf",
+    "fileName": "DOC-20251210-WA0023..pdf",
+    "createdAt": "2026-03-11T15:06:41.776Z",
+    "updatedAt": "2026-03-11T15:09:09.460Z",
+    "id": "ol9j56lg4a",
+    "content": "Error extracting PDF text.",
+    "summary": "## 📄 1. Executive Summary\nThis document, an error message extracted from a PDF text extraction process, highlights a critical issue in the current system's functionality. The primary focus is on the inability to accurately process and convert PDF content into readable text, underscoring the need for robust error handling and improved text recognition technology.\n\n## 💡 2. Key Themes & Main Ideas\n- **Error Handling**: The document emphasizes the importance of robust error handling mechanisms to manage and resolve issues like the one encountered in PDF text extraction.\n- **Text Recognition**: It underscores the necessity for advanced text recognition algorithms to improve accuracy in converting PDF documents into readable formats.\n- **System Reliability**: The error message highlights the system's unreliability in processing certain types of documents, which is a significant concern for maintaining user trust and satisfaction.\n\n## 📊 3. Crucial Details & Evidence\n- *Error Message*: \"Error extracting PDF text.\"\n- *Context*: The message indicates that the system failed to correctly interpret and convert the text within the PDF file, leading to a failure in the intended operation.\n\n## 🚀 4. Strategic Implications & Actionable Takeaways\n- 🛠 **Tactical Takeaway**: Develop and implement a comprehensive error handling system to ensure robustness in PDF text extraction processes.\n- 🗺️ **Strategic Implication**: Invest in research and development to enhance text recognition technology, aiming to improve accuracy and reliability in handling various document formats.",
+    "sentiment": "neutral",
+    "sentimentScore": -0.5,
+    "sentimentDetail": {
+      "positive": 0,
+      "negative": 1,
+      "neutral": 3
+    },
+    "themes": [
+      "Error",
+      "Extracting",
+      "Text"
+    ],
+    "quotes": [],
+    "wordCount": 4,
+    "vectorized": true,
+    "aiMeta": {
+      "summarySource": "ollama",
+      "transcriptionSource": "pdf",
+      "ollamaModel": "qwen2.5:3b",
+      "chromaIndexed": true
+    }
+  }
+]
