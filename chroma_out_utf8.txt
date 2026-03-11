@@ -1,0 +1,20 @@
+﻿
+
+chroma.exe : Address 
+localhost:8000 is not 
+available
+At line:1 char:1
++ & "C:\Users\DELL\AppData\Lo
+cal\Packages\PythonSoftwareFo
+undation.Pyth ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (Address  
+   localhost:8000 is not a   
+ vailable:String) [], Rem    
+oteException
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
